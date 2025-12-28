@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CommunicateX API Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              background: '#050505', // Deep Black
+              surface: '#0a0a0a',    // Almost Black
+              surfaceLight: '#18181b', // Zinc 900
+              surfaceHighlight: '#27272a', // Zinc 800
+              primary: '#ea580c',    // Orange 600
+              primaryHover: '#c2410c', // Orange 700
+              accent: '#f97316',     // Orange 500
+              danger: '#ef4444',     // Red 500
+              success: '#10b981',    // Emerald 500
+              border: '#27272a',     // Zinc 800
+              textSecondary: '#a1a1aa', // Zinc 400
+            },
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #050505; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #27272a; 
+        border-radius: 5px;
+        border: 2px solid #050505;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3f3f46; 
+      }
+      body {
+        background-color: #050505;
+        color: #fafafa;
+        font-family: 'Inter', sans-serif;
+      }
+      
+      /* Subtle glow effect for active elements */
+      .glow-primary {
+        box-shadow: 0 0 20px -5px rgba(234, 88, 12, 0.3);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

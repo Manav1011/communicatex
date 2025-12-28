@@ -1,0 +1,101 @@
+
+export enum HttpMethod {
+  GET = 'GET',
+  POST = 'POST',
+  PUT = 'PUT',
+  PATCH = 'PATCH',
+  DELETE = 'DELETE',
+}
+
+export enum AuthMethod {
+  NONE = 'none',
+  BEARER = 'bearer',
+  BASIC = 'basic',
+  API_KEY = 'api_key',
+}
+
+export interface KeyValueItem {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+}
+
+export interface RequestAuth {
+  type: AuthMethod;
+  token?: string;
+  username?: string;
+  password?: string;
+  apiKeyKey?: string;
+  apiKeyValue?: string;
+  apiKeyLocation?: 'header' | 'query';
+}
+
+export interface ApiRequest {
+  id: string;
+  name: string;
+  method: HttpMethod;
+  url: string;
+  params: KeyValueItem[];
+  headers: KeyValueItem[];
+  bodyType: 'json' | 'none'; // simplified for this demo
+  bodyContent: string;
+  auth: RequestAuth;
+}
+
+// Extends ApiRequest to include organization data
+export interface SavedRequest extends ApiRequest {
+  collectionId: string;
+  workspaceId: string;
+  updatedAt: number;
+}
+
+export interface ApiResponse {
+  statusCode: number;
+  statusText: string;
+  time: number; // ms
+  size: number; // bytes
+  headers: Record<string, string>;
+  data: any;
+  error?: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface Collection {
+  id: string;
+  workspaceId: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  variables: KeyValueItem[];
+}
+
+export interface HistoryItem {
+  id: string;
+  workspaceId: string;
+  timestamp: number;
+  request: ApiRequest;
+  responseStatus?: number;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+// Mock User for Auth simulation
+export const MOCK_USER: User = {
+  id: 'u_123',
+  email: 'demo@communicatex.dev',
+  name: 'CommunicateX Developer',
+};
