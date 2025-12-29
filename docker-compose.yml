@@ -24,7 +24,7 @@ services:
     image: node:20-alpine
     container_name: communicatex-backend
     working_dir: /app
-    command: sh -c "npm install --include=dev && npm run build && NODE_ENV=production node server.cjs"
+    command: sh -c "npm install --include=dev && export VITE_API_BASE='' && npm run build -- --mode production && NODE_ENV=production node server.cjs"
     environment:
       PORT: 4000
       DB_HOST: postgres
@@ -33,7 +33,7 @@ services:
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       NODE_ENV: production
-      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:4000}
+      VITE_API_BASE: ""
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "${BACKEND_PORT:-4001}:4000"

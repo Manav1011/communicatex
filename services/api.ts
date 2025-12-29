@@ -1,4 +1,17 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4001';
+// Always use relative URLs when VITE_API_BASE is empty, undefined, or in production mode
+// This ensures the frontend works when accessed via IP address or any hostname
+// Only use absolute URL if VITE_API_BASE is explicitly set to a non-empty value
+const getApiBase = () => {
+  const viteApiBase = import.meta.env.VITE_API_BASE;
+  // If explicitly empty string, undefined, or production mode, use relative URLs
+  if (viteApiBase === '' || !viteApiBase || import.meta.env.PROD) {
+    return '';
+  }
+  // Otherwise use the configured value
+  return viteApiBase;
+};
+
+const API_BASE = getApiBase();
 
 // Export API_BASE for use in other files
 export const API_BASE_URL = API_BASE;
