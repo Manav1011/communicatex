@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ApiRequest, HttpMethod, KeyValueItem, AuthMethod } from '../types';
-import { Play, Save, Layers, Shield, FileJson, Link, ChevronDown } from 'lucide-react';
+import { Play, Save, Layers, Shield, FileJson, Link, ChevronDown, Globe, ShieldAlert } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
 import AutocompleteInput from './AutocompleteInput';
 import CustomSelect from './CustomSelect';
@@ -23,6 +23,10 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
 
   const handleUrlChange = (value: string) => {
     onRequestChange({ ...request, url: value });
+  };
+
+  const toggleProxy = () => {
+    onRequestChange({ ...request, useProxy: !request.useProxy });
   };
 
   const updateParams = (items: KeyValueItem[]) => onRequestChange({ ...request, params: items });
@@ -77,6 +81,21 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
                   placeholder="https://api.example.com/v1/endpoint"
                   className="w-full h-full bg-transparent px-4 text-zinc-100 text-sm focus:outline-none font-mono placeholder-zinc-600"
                />
+            </div>
+
+            {/* Proxy Toggle */}
+            <div className="border-l border-border h-full flex items-center justify-center w-10 px-1">
+                <button
+                  onClick={toggleProxy}
+                  className={`p-1.5 rounded-md transition-all ${
+                      request.useProxy 
+                        ? 'text-primary bg-primary/10 shadow-[0_0_10px_-3px_rgba(234,88,12,0.5)]' 
+                        : 'text-zinc-600 hover:text-zinc-400'
+                  }`}
+                  title={request.useProxy ? "Proxy Enabled: Bypassing CORS" : "Proxy Disabled: Direct Browser Request"}
+                >
+                   <Globe size={16} />
+                </button>
             </div>
           </div>
           

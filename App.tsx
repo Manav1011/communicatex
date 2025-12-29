@@ -16,7 +16,8 @@ const DEFAULT_REQUEST: ApiRequest = {
   headers: [],
   bodyType: 'none',
   bodyContent: '{\n\t\n}',
-  auth: { type: AuthMethod.NONE }
+  auth: { type: AuthMethod.NONE },
+  useProxy: false
 };
 
 const DEFAULT_WORKSPACE: Workspace = {
@@ -327,7 +328,8 @@ const App: React.FC = () => {
   };
 
   const restoreRequest = (req: ApiRequest) => {
-    setRequest({ ...req }); // Clone to avoid ref issues
+    // Ensure useProxy is set even if restoring old request
+    setRequest({ ...req, useProxy: req.useProxy ?? false }); 
     setResponse(null);
   };
 

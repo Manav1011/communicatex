@@ -41,6 +41,7 @@ export interface ApiRequest {
   bodyType: 'json' | 'none'; // simplified for this demo
   bodyContent: string;
   auth: RequestAuth;
+  useProxy: boolean;
 }
 
 // Extends ApiRequest to include organization data

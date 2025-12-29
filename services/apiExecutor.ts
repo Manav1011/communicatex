@@ -11,6 +11,8 @@ const interpolate = (text: string, variables: Record<string, string>): string =>
   });
 };
 
+const PROXY_URL = 'http://localhost:3001/proxy';
+
 export const executeRequest = async (request: ApiRequest, environmentVariables: KeyValueItem[] = []): Promise<ApiResponse> => {
   const startTime = performance.now();
   
@@ -28,7 +30,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
   // Construct URL with interpolated params
   let urlObj: URL;
   try {
-    // If URL doesn't have protocol, default to http for construction (though fetch might fail if not absolute)
+    // If URL doesn't have protocol, default to http for construction
     if (!finalUrl.startsWith('http')) {
         finalUrl = 'https://' + finalUrl;
     }
@@ -78,10 +80,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
   let body: BodyInit | null = null;
   if (request.method !== HttpMethod.GET && request.bodyType === 'json' && request.bodyContent) {
     try {
-      // Interpolate the raw string BEFORE parsing to JSON to allow partial replacements
-      // e.g. { "key": "<<some_value>>" }
       const interpolatedBody = interpolate(request.bodyContent, varMap);
-      
       // Validate JSON
       JSON.parse(interpolatedBody);
       body = interpolatedBody;
@@ -92,39 +91,77 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
   }
 
   try {
-    const res = await fetch(urlObj.toString(), {
-      method: request.method,
-      headers,
-      body,
-      mode: 'cors', 
-    });
-
-    const endTime = performance.now();
-    const time = Math.round(endTime - startTime);
-    const size = Number(res.headers.get('content-length')) || 0;
-    
-    // Parse headers to object
-    const resHeaders: Record<string, string> = {};
-    res.headers.forEach((val, key) => {
-      resHeaders[key] = val;
-    });
-
+    let res: Response;
     let data;
-    const contentType = res.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      data = await res.json();
-    } else {
-      data = await res.text();
-    }
+    let time = 0;
+    let size = 0;
+    let resHeaders: Record<string, string> = {};
+    let statusCode = 0;
+    let statusText = '';
 
-    return {
-      statusCode: res.status,
-      statusText: res.statusText,
-      time,
-      size,
-      headers: resHeaders,
-      data
-    };
+    if (request.useProxy) {
+      // PROXY MODE
+      // Convert Headers object to plain object for sending JSON
+      const plainHeaders: Record<string, string> = {};
+      headers.forEach((val, key) => { plainHeaders[key] = val; });
+
+      const proxyRes = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: urlObj.toString(),
+          method: request.method,
+          headers: plainHeaders,
+          body: body
+        })
+      });
+
+      if (!proxyRes.ok) {
+         // If proxy server itself fails (not the target API)
+         throw new Error(`Proxy Server Error: ${proxyRes.statusText}`);
+      }
+
+      // The proxy returns the structure of ApiResponse directly
+      const proxyData: ApiResponse = await proxyRes.json();
+      return proxyData;
+
+    } else {
+      // DIRECT BROWSER MODE
+      res = await fetch(urlObj.toString(), {
+        method: request.method,
+        headers,
+        body,
+        mode: 'cors', 
+      });
+
+      const endTime = performance.now();
+      time = Math.round(endTime - startTime);
+      size = Number(res.headers.get('content-length')) || 0;
+      statusCode = res.status;
+      statusText = res.statusText;
+      
+      res.headers.forEach((val, key) => {
+        resHeaders[key] = val;
+      });
+
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        data = await res.text();
+      }
+
+      return {
+        statusCode,
+        statusText,
+        time,
+        size,
+        headers: resHeaders,
+        data
+      };
+    }
 
   } catch (error: any) {
      return {
@@ -134,7 +171,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
       size: 0,
       headers: {},
       data: null,
-      error: error.message || 'Failed to fetch. This may be due to CORS policies on the target API.',
+      error: error.message || 'Failed to fetch. Try enabling Proxy Mode to bypass CORS.',
     };
   }
 };
