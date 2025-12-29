@@ -16,6 +16,10 @@ const DEFAULT_REQUEST: ApiRequest = {
   headers: [],
   bodyType: 'none',
   bodyContent: '{\n\t\n}',
+  multipartParams: [],
+  formEncodedParams: [],
+  graphqlQuery: '',
+  graphqlVariables: '{\n\t\n}',
   auth: { type: AuthMethod.NONE },
   useProxy: false
 };
@@ -328,8 +332,12 @@ const App: React.FC = () => {
   };
 
   const restoreRequest = (req: ApiRequest) => {
-    // Ensure useProxy is set even if restoring old request
-    setRequest({ ...req, useProxy: req.useProxy ?? false }); 
+    // Ensure new fields are initialized if restoring old request data
+    setRequest({ 
+        ...DEFAULT_REQUEST,
+        ...req, 
+        useProxy: req.useProxy ?? false 
+    }); 
     setResponse(null);
   };
 

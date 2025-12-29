@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { ApiRequest, HttpMethod, KeyValueItem, AuthMethod } from '../types';
-import { Play, Save, Layers, Shield, FileJson, Link, ChevronDown, Globe, ShieldAlert } from 'lucide-react';
+import { Play, Save, Layers, Shield, FileJson, Link, Globe, Code, X } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
 import AutocompleteInput from './AutocompleteInput';
 import CustomSelect from './CustomSelect';
+import RequestAuth from './request/RequestAuth';
+import RequestBody from './request/RequestBody';
+import { generateCurl, generateJavascript, generatePython } from '../services/codeGenerator';
 
 interface RequestPanelProps {
   request: ApiRequest;
@@ -16,6 +19,8 @@ interface RequestPanelProps {
 
 const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, onSend, onSave, loading, environmentVariables = [] }) => {
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body'>('params');
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [codeLang, setCodeLang] = useState<'curl' | 'js' | 'python'>('curl');
 
   const handleMethodChange = (val: string) => {
     onRequestChange({ ...request, method: val as HttpMethod });
@@ -49,12 +54,14 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
     className: getMethodColor(m) + ' font-bold'
   }));
 
-  const authOptions = [
-    { value: AuthMethod.NONE, label: 'No Authentication' },
-    { value: AuthMethod.BEARER, label: 'Bearer Token' },
-    { value: AuthMethod.BASIC, label: 'Basic Auth' },
-    { value: AuthMethod.API_KEY, label: 'API Key' },
-  ];
+  const generatedCode = () => {
+      switch(codeLang) {
+          case 'curl': return generateCurl(request);
+          case 'js': return generateJavascript(request);
+          case 'python': return generatePython(request);
+          default: return '';
+      }
+  }
 
   return (
     <div className="flex flex-col h-full bg-surface">
@@ -99,6 +106,14 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
             </div>
           </div>
           
+          <button 
+             onClick={() => setShowCodeModal(true)}
+             className="px-3 bg-surfaceHighlight hover:bg-surfaceLight border border-border text-zinc-400 hover:text-white rounded-lg transition-all"
+             title="Generate Code"
+          >
+             <Code size={16} />
+          </button>
+
           <button 
             onClick={onSave}
             className="px-4 bg-surfaceHighlight hover:bg-surfaceLight border border-border text-zinc-200 font-bold rounded-lg flex items-center gap-2 transition-all active:scale-95"
@@ -170,173 +185,60 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
           )}
 
           {activeTab === 'auth' && (
-            <div className="h-full flex flex-col max-w-xl animate-in fade-in duration-300">
-              <div className="mb-6">
-                  <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Authentication Type</label>
-                  <CustomSelect 
-                    value={request.auth.type}
-                    onChange={(val) => onRequestChange({...request, auth: { ...request.auth, type: val as AuthMethod }})}
-                    options={authOptions}
-                    className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-sm text-zinc-200"
-                  />
-              </div>
-
-              {request.auth.type === AuthMethod.BEARER && (
-                <div>
-                  <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Token</label>
-                  <div className="h-32 bg-surfaceLight border border-border rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary relative focus-within:z-10">
-                    <AutocompleteInput
-                      type="textarea"
-                      value={request.auth.token || ''}
-                      onChange={(val) => onRequestChange({...request, auth: { ...request.auth, token: val }})}
-                      variables={environmentVariables}
-                      placeholder="Enter your JWT or OAuth token here"
-                      className="w-full h-full bg-transparent p-3 text-sm text-zinc-200 font-mono outline-none resize-none placeholder-zinc-600"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {request.auth.type === AuthMethod.BASIC && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Username</label>
-                    <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-                       <AutocompleteInput 
-                          value={request.auth.username || ''}
-                          onChange={(val) => onRequestChange({...request, auth: { ...request.auth, username: val }})}
-                          variables={environmentVariables}
-                          className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                        />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Password</label>
-                     <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-                        <AutocompleteInput 
-                            type="password"
-                            value={request.auth.password || ''}
-                            onChange={(val) => onRequestChange({...request, auth: { ...request.auth, password: val }})}
-                            variables={environmentVariables}
-                            className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                        />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {request.auth.type === AuthMethod.API_KEY && (
-                <div className="space-y-5">
-                  <div className="flex gap-4">
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Key</label>
-                         <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-                            <AutocompleteInput 
-                                placeholder="X-API-KEY"
-                                value={request.auth.apiKeyKey || ''}
-                                onChange={(val) => onRequestChange({...request, auth: { ...request.auth, apiKeyKey: val }})}
-                                variables={environmentVariables}
-                                className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                            />
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Value</label>
-                         <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-                            <AutocompleteInput 
-                                placeholder="Key Value"
-                                value={request.auth.apiKeyValue || ''}
-                                onChange={(val) => onRequestChange({...request, auth: { ...request.auth, apiKeyValue: val }})}
-                                variables={environmentVariables}
-                                className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                            />
-                        </div>
-                      </div>
-                  </div>
-                  <div>
-                      <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-3">Add To</label>
-                      <div className="flex gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer group">
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.auth.apiKeyLocation === 'header' ? 'border-primary' : 'border-zinc-600'}`}>
-                                {request.auth.apiKeyLocation === 'header' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                              </div>
-                              <input 
-                                type="radio" 
-                                className="hidden"
-                                name="apikey_loc" 
-                                checked={request.auth.apiKeyLocation === 'header'} 
-                                onChange={() => onRequestChange({...request, auth: {...request.auth, apiKeyLocation: 'header'}})}
-                              />
-                              <span className="text-sm text-zinc-300 group-hover:text-white">Header</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer group">
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.auth.apiKeyLocation === 'query' ? 'border-primary' : 'border-zinc-600'}`}>
-                                {request.auth.apiKeyLocation === 'query' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                              </div>
-                              <input 
-                                type="radio" 
-                                className="hidden"
-                                name="apikey_loc" 
-                                checked={request.auth.apiKeyLocation === 'query'} 
-                                onChange={() => onRequestChange({...request, auth: {...request.auth, apiKeyLocation: 'query'}})}
-                              />
-                              <span className="text-sm text-zinc-300 group-hover:text-white">Query Params</span>
-                          </label>
-                      </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <RequestAuth 
+                request={request}
+                onRequestChange={onRequestChange}
+                environmentVariables={environmentVariables}
+            />
           )}
 
           {activeTab === 'body' && (
-            <div className="h-full flex flex-col animate-in fade-in duration-300">
-              <div className="mb-4 flex gap-6 border-b border-border pb-4">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.bodyType === 'none' ? 'border-primary' : 'border-zinc-600'}`}>
-                    {request.bodyType === 'none' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                  </div>
-                  <input 
-                    key="radio-none"
-                    type="radio" 
-                    className="hidden"
-                    name="bodyType" 
-                    checked={request.bodyType === 'none'}
-                    onChange={() => onRequestChange({...request, bodyType: 'none'})}
-                  />
-                  <span className="text-sm text-zinc-300 group-hover:text-white">None</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.bodyType === 'json' ? 'border-primary' : 'border-zinc-600'}`}>
-                    {request.bodyType === 'json' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                  </div>
-                  <input 
-                    key="radio-json"
-                    type="radio" 
-                    className="hidden"
-                    name="bodyType" 
-                    checked={request.bodyType === 'json'}
-                    onChange={() => onRequestChange({...request, bodyType: 'json'})}
-                  />
-                  <span className="text-sm text-zinc-300 group-hover:text-white">JSON</span>
-                </label>
-              </div>
-              {request.bodyType === 'json' && (
-                <div className="flex-1 relative bg-surfaceLight border border-border rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:z-10">
-                  <AutocompleteInput 
-                    type="textarea"
-                    value={request.bodyContent}
-                    onChange={(val) => onRequestChange({ ...request, bodyContent: val })}
-                    variables={environmentVariables}
-                    className="absolute inset-0 w-full h-full bg-transparent p-4 text-sm font-mono text-zinc-200 outline-none resize-none leading-relaxed placeholder-zinc-600"
-                    placeholder="{\n  \"key\": \"value\"\n}"
-                  />
-                </div>
-              )}
-            </div>
+            <RequestBody 
+                request={request}
+                onRequestChange={onRequestChange}
+                environmentVariables={environmentVariables}
+            />
           )}
         </div>
       </div>
+
+      {/* Code Generation Modal */}
+      {showCodeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="w-full max-w-2xl bg-surface border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between p-4 border-b border-border bg-surfaceLight/30">
+                      <div className="flex items-center gap-2">
+                        <Code size={18} className="text-primary" />
+                        <h3 className="font-bold text-white">Generate Code</h3>
+                      </div>
+                      <button onClick={() => setShowCodeModal(false)} className="text-textSecondary hover:text-white"><X size={18} /></button>
+                  </div>
+                  
+                  <div className="flex border-b border-border">
+                      <button onClick={() => setCodeLang('curl')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${codeLang === 'curl' ? 'bg-surfaceLight text-white border-b-2 border-primary' : 'text-textSecondary hover:bg-surfaceLight/50'}`}>cURL</button>
+                      <button onClick={() => setCodeLang('js')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${codeLang === 'js' ? 'bg-surfaceLight text-white border-b-2 border-primary' : 'text-textSecondary hover:bg-surfaceLight/50'}`}>JavaScript</button>
+                      <button onClick={() => setCodeLang('python')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${codeLang === 'python' ? 'bg-surfaceLight text-white border-b-2 border-primary' : 'text-textSecondary hover:bg-surfaceLight/50'}`}>Python</button>
+                  </div>
+
+                  <div className="p-0 bg-[#0d0d0d]">
+                      <textarea 
+                        readOnly 
+                        value={generatedCode()} 
+                        className="w-full h-64 p-4 bg-transparent text-sm font-mono text-zinc-300 outline-none resize-none"
+                      />
+                  </div>
+
+                  <div className="p-4 border-t border-border bg-surface flex justify-end">
+                      <button 
+                        onClick={() => { navigator.clipboard.writeText(generatedCode()); setShowCodeModal(false); }}
+                        className="px-4 py-2 bg-primary hover:bg-primaryHover text-white text-sm font-bold rounded-lg"
+                      >
+                          Copy to Clipboard
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

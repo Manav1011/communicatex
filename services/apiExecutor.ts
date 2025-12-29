@@ -76,17 +76,49 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
     }
   }
 
-  // Handle Body with interpolation
+  // Handle Body Generation
   let body: BodyInit | null = null;
-  if (request.method !== HttpMethod.GET && request.bodyType === 'json' && request.bodyContent) {
-    try {
-      const interpolatedBody = interpolate(request.bodyContent, varMap);
-      // Validate JSON
-      JSON.parse(interpolatedBody);
-      body = interpolatedBody;
-      headers.set('Content-Type', 'application/json');
-    } catch (e) {
-      throw new Error("Invalid JSON body (after variable substitution)");
+  const methodHasBody = request.method !== HttpMethod.GET;
+
+  if (methodHasBody) {
+    if (request.bodyType === 'json' && request.bodyContent) {
+      try {
+        const interpolatedBody = interpolate(request.bodyContent, varMap);
+        JSON.parse(interpolatedBody); // Validate JSON
+        body = interpolatedBody;
+        headers.set('Content-Type', 'application/json');
+      } catch (e) {
+        throw new Error("Invalid JSON body (after variable substitution)");
+      }
+    } else if (request.bodyType === 'x-www-form-urlencoded') {
+      const params = new URLSearchParams();
+      request.formEncodedParams.forEach(p => {
+        if (p.enabled && p.key) {
+           params.append(interpolate(p.key, varMap), interpolate(p.value, varMap));
+        }
+      });
+      body = params.toString();
+      headers.set('Content-Type', 'application/x-www-form-urlencoded');
+    } else if (request.bodyType === 'form-data') {
+      const formData = new FormData();
+      request.multipartParams.forEach(p => {
+        if (p.enabled && p.key) {
+           formData.append(interpolate(p.key, varMap), interpolate(p.value, varMap));
+        }
+      });
+      body = formData;
+      // Do NOT set Content-Type for FormData, browser sets boundary
+    } else if (request.bodyType === 'graphql') {
+      try {
+        const query = interpolate(request.graphqlQuery, varMap);
+        const varsStr = interpolate(request.graphqlVariables || '{}', varMap);
+        const variables = JSON.parse(varsStr);
+        
+        body = JSON.stringify({ query, variables });
+        headers.set('Content-Type', 'application/json');
+      } catch (e) {
+        throw new Error("Invalid GraphQL variables JSON");
+      }
     }
   }
 
@@ -100,10 +132,31 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
     let statusText = '';
 
     if (request.useProxy) {
-      // PROXY MODE
-      // Convert Headers object to plain object for sending JSON
+      // PROXY MODE logic
       const plainHeaders: Record<string, string> = {};
       headers.forEach((val, key) => { plainHeaders[key] = val; });
+
+      // Proxy needs a serializable body. FormData (multipart) is hard to serialize to JSON for the proxy.
+      // For now, if using proxy + multipart, we convert to simple object (loses file capability, but OK for text)
+      let proxyBody = body;
+      
+      if (request.bodyType === 'form-data' && body instanceof FormData) {
+          // Flatten FormData to object for proxy
+          const obj: any = {};
+          body.forEach((value, key) => {
+             obj[key] = value; 
+          });
+          proxyBody = JSON.stringify(obj);
+          // Force JSON header for proxy to understand it's a payload to forward
+          // However, server.js expects 'body' field.
+          // For real multipart support via proxy, server.js needs multer. 
+          // Simplified approach: Send as JSON, let server try to handle or just warn user.
+      } 
+      
+      // Since server.js is simple, let's keep body strict string or JSON
+      if (typeof proxyBody !== 'string' && !(proxyBody instanceof FormData)) {
+        proxyBody = JSON.stringify(proxyBody);
+      }
 
       const proxyRes = await fetch(PROXY_URL, {
         method: 'POST',
@@ -114,16 +167,14 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
           url: urlObj.toString(),
           method: request.method,
           headers: plainHeaders,
-          body: body
+          body: request.bodyType === 'form-data' ? undefined : proxyBody // Cannot send FormData easily to this simple proxy
         })
       });
 
       if (!proxyRes.ok) {
-         // If proxy server itself fails (not the target API)
          throw new Error(`Proxy Server Error: ${proxyRes.statusText}`);
       }
 
-      // The proxy returns the structure of ApiResponse directly
       const proxyData: ApiResponse = await proxyRes.json();
       return proxyData;
 

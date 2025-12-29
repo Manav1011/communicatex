@@ -31,6 +31,8 @@ export interface RequestAuth {
   apiKeyLocation?: 'header' | 'query';
 }
 
+export type BodyType = 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'graphql';
+
 export interface ApiRequest {
   id: string;
   name: string;
@@ -38,8 +40,15 @@ export interface ApiRequest {
   url: string;
   params: KeyValueItem[];
   headers: KeyValueItem[];
-  bodyType: 'json' | 'none'; // simplified for this demo
-  bodyContent: string;
+  
+  // Body Config
+  bodyType: BodyType;
+  bodyContent: string; // Used for JSON
+  multipartParams: KeyValueItem[];
+  formEncodedParams: KeyValueItem[];
+  graphqlQuery: string;
+  graphqlVariables: string;
+
   auth: RequestAuth;
   useProxy: boolean;
 }
