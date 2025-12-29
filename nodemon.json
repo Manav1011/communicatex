@@ -1,0 +1,10 @@
+{
+  "watch": ["server.cjs"],
+  "ext": "js,cjs,json",
+  "ignore": ["node_modules", "dist", "*.db"],
+  "exec": "node server.cjs",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
+

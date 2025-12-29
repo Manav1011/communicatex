@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: communicatex-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-communicatex}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - communicatex-network
+
+  backend:
+    image: node:20-alpine
+    container_name: communicatex-backend
+    working_dir: /app
+    command: sh -c "npm install && npm run proxy:watch"
+    environment:
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-communicatex}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      NODE_ENV: development
+    ports:
+      - "${BACKEND_PORT:-4001}:4000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - communicatex-network
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-alpine
+    container_name: communicatex-frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:4001}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - communicatex-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  communicatex-network:
+    driver: bridge

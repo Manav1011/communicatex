@@ -7,20 +7,25 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "proxy": "node server.cjs"
+    "proxy": "node server.cjs",
+    "proxy:watch": "nodemon server.cjs",
+    "start": "node server.cjs",
+    "start:prod": "NODE_ENV=production node server.cjs",
+    "build:prod": "npm run build && npm run start:prod"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "lucide-react": "^0.562.0",
+    "pg": "^8.13.1",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "sqlite3": "^5.1.7"
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "nodemon": "^3.1.7",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

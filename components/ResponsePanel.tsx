@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ApiResponse } from '../types';
-import { Clock, Database, AlertCircle, CheckCircle, Terminal, FileCode, Layers, Cookie } from 'lucide-react';
+import { Clock, Database, AlertCircle, CheckCircle, Terminal, FileCode, Layers, Cookie, Copy, Download, Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react';
 
 interface ResponsePanelProps {
   response: ApiResponse | null;
@@ -9,6 +9,8 @@ interface ResponsePanelProps {
 
 const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading }) => {
   const [activeTab, setActiveTab] = useState<'body' | 'headers'>('body');
+  const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   if (loading) {
     return (
@@ -51,6 +53,47 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading }) => {
   const isHtml = contentType.includes('text/html');
   const isJson = contentType.includes('application/json') || (typeof response.data === 'object');
 
+  // Format JSON response
+  const formatJson = (data: any): string => {
+    try {
+      if (typeof data === 'string') {
+        const parsed = JSON.parse(data);
+        return JSON.stringify(parsed, null, 2);
+      }
+      return JSON.stringify(data, null, 2);
+    } catch {
+      return typeof data === 'string' ? data : JSON.stringify(data);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const downloadResponse = () => {
+    const content = typeof response.data === 'object' 
+      ? JSON.stringify(response.data, null, 2)
+      : response.data;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `response-${Date.now()}.${isJson ? 'json' : 'txt'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const responseText = typeof response.data === 'object' 
+    ? (viewMode === 'pretty' ? formatJson(response.data) : JSON.stringify(response.data))
+    : response.data;
+
   return (
     <div className="h-full flex flex-col bg-surface">
       {/* Response Meta Bar */}
@@ -80,8 +123,9 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading }) => {
             </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex px-2">
+        {/* Tabs and Actions */}
+        <div className="flex items-center justify-between px-2 border-b border-border">
+          <div className="flex">
              <button
                 onClick={() => setActiveTab('body')}
                 className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
@@ -102,6 +146,36 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading }) => {
               >
                 <Layers size={14} /> Headers
               </button>
+          </div>
+          
+          {activeTab === 'body' && response && !response.error && (
+            <div className="flex items-center gap-2 px-2">
+              {isJson && (
+                <button
+                  onClick={() => setViewMode(viewMode === 'pretty' ? 'raw' : 'pretty')}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-textSecondary hover:text-white hover:bg-surfaceLight rounded transition-all"
+                  title={viewMode === 'pretty' ? 'Raw View' : 'Pretty View'}
+                >
+                  {viewMode === 'pretty' ? <EyeOff size={14} /> : <Eye size={14} />}
+                  <span>{viewMode === 'pretty' ? 'Raw' : 'Pretty'}</span>
+                </button>
+              )}
+              <button
+                onClick={() => copyToClipboard(responseText)}
+                className="p-1.5 text-textSecondary hover:text-white hover:bg-surfaceLight rounded transition-all"
+                title="Copy to clipboard"
+              >
+                <Copy size={14} />
+              </button>
+              <button
+                onClick={downloadResponse}
+                className="p-1.5 text-textSecondary hover:text-white hover:bg-surfaceLight rounded transition-all"
+                title="Download response"
+              >
+                <Download size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -141,10 +215,10 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading }) => {
                                 sandbox="allow-scripts"
                              />
                         ) : (
-                            <pre className="whitespace-pre-wrap break-all p-4">
-                                {typeof response.data === 'object' 
-                                ? JSON.stringify(response.data, null, 2) 
-                                : response.data}
+                            <pre className={`whitespace-pre-wrap break-all p-4 font-mono text-sm ${
+                              viewMode === 'pretty' && isJson ? 'text-zinc-300' : 'text-zinc-300'
+                            }`}>
+                                {responseText}
                             </pre>
                         )}
                     </div>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ApiRequest, ApiResponse, HttpMethod, AuthMethod, HistoryItem, User, MOCK_USER, Workspace, Environment, KeyValueItem, Collection, SavedRequest, Invitation } from './types';
 import { executeRequest } from './services/apiExecutor';
-import { apiService } from './services/api';
+import { apiService, API_BASE_URL } from './services/api';
 import RequestPanel from './components/RequestPanel';
 import ResponsePanel from './components/ResponsePanel';
 import KeyValueEditor from './components/KeyValueEditor';
-import { History, LogOut, Zap, LayoutGrid, Clock, ChevronDown, ChevronRight, Plus, Check, Box, Database, Trash2, Settings, Folder, Save, MoreVertical, FolderOpen, FileText, Mail, X } from 'lucide-react';
+import { History, LogOut, Zap, LayoutGrid, Clock, ChevronDown, ChevronRight, Plus, Check, Box, Database, Trash2, Settings, Folder, Save, MoreVertical, FolderOpen, FileText, Mail, X, Copy, Edit, ExternalLink } from 'lucide-react';
 
 const DEFAULT_REQUEST: ApiRequest = {
   id: 'default',
@@ -58,6 +58,7 @@ const App: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+  const [isEnvExpanded, setIsEnvExpanded] = useState(false);
   const [showSaveRequestModal, setShowSaveRequestModal] = useState(false);
   const [showCreateCollectionModal, setShowCreateCollectionModal] = useState(false);
   const [saveRequestName, setSaveRequestName] = useState('');
@@ -71,8 +72,17 @@ const App: React.FC = () => {
   const [showEnvModal, setShowEnvModal] = useState(false);
   const [editingEnvId, setEditingEnvId] = useState<string | null>(null);
 
-  const [request, setRequest] = useState<ApiRequest>(DEFAULT_REQUEST);
-  const [response, setResponse] = useState<ApiResponse | null>(null);
+  // Request Tabs State
+  const [requestTabs, setRequestTabs] = useState<Array<{ id: string; request: ApiRequest; response: ApiResponse | null }>>([
+    { id: 'default', request: DEFAULT_REQUEST, response: null }
+  ]);
+  const [activeTabId, setActiveTabId] = useState<string>('default');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  const [collectionContextMenu, setCollectionContextMenu] = useState<{ x: number; y: number; collectionId: string } | null>(null);
+
+  const activeTab = requestTabs.find(tab => tab.id === activeTabId) || requestTabs[0];
+  const request = activeTab?.request || DEFAULT_REQUEST;
+  const response = activeTab?.response || null;
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   
@@ -88,7 +98,7 @@ const App: React.FC = () => {
 
   const fetchInvitations = async (userEmail: string) => {
     try {
-      const res = await fetch(`http://localhost:4000/invitations?email=${encodeURIComponent(userEmail)}`);
+      const res = await fetch(`${API_BASE_URL}/invitations?email=${encodeURIComponent(userEmail)}`);
       const data = await res.json();
       if (res.ok && data.invitations) {
         setInvitations(data.invitations);
@@ -115,11 +125,15 @@ const App: React.FC = () => {
             // Fetch user preferences
             const prefs = await apiService.getPreferences(savedUser.backendId);
             if (prefs.defaultProxyMode !== undefined) {
-              setRequest(prev => ({ ...prev, useProxy: prefs.defaultProxyMode === 1 }));
+              setRequestTabs(prev => prev.map(tab => 
+                tab.id === (activeTabId || 'default')
+                  ? { ...tab, request: { ...tab.request, useProxy: prefs.defaultProxyMode === 1 } }
+                  : tab
+              ));
             }
             
             // Fetch user's workspaces from backend
-            const wsRes = await fetch(`http://localhost:4000/workspaces?userId=${savedUser.backendId}`);
+            const wsRes = await fetch(`${API_BASE_URL}/workspaces?userId=${savedUser.backendId}`);
             const wsData = await wsRes.json();
             if (wsRes.ok && wsData.workspaces) {
               const backendWorkspaces: Workspace[] = wsData.workspaces.map((ws: any) => ({
@@ -174,8 +188,9 @@ const App: React.FC = () => {
         const reqs = await apiService.getSavedRequests(workspace.backendId);
         setSavedRequests(reqs.map((r: any) => ({
           ...r,
-          id: r.id || `req_${Date.now()}`,
+          id: String(r.id) || `req_${Date.now()}`,
           workspaceId: workspace.id,
+          collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
         })));
         
         // Load environments
@@ -212,12 +227,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isInitialized || !user?.backendId) return;
     const activeWs = workspaces.find(w => w.id === activeWorkspaceId);
+    const activeTabRequest = requestTabs.find(tab => tab.id === activeTabId)?.request;
     apiService.updatePreferences(user.backendId, {
       activeWorkspaceId: activeWs?.backendId || null,
       activeEnvId: activeEnvId ? parseInt(activeEnvId.replace('env_', '')) : null,
-      defaultProxyMode: request.useProxy,
+      defaultProxyMode: activeTabRequest?.useProxy ?? false,
     });
-  }, [activeWorkspaceId, activeEnvId, request.useProxy, isInitialized, user?.backendId]);
+  }, [activeWorkspaceId, activeEnvId, activeTabId, requestTabs, isInitialized, user?.backendId]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,7 +242,7 @@ const App: React.FC = () => {
 
     try {
       const endpoint = isLogin ? '/auth/login' : '/auth/signup';
-      const res = await fetch('http://localhost:4000' + endpoint, {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name: email.split('@')[0] || 'User' }),
@@ -257,11 +273,15 @@ const App: React.FC = () => {
       // Fetch user preferences
       const prefs = await apiService.getPreferences(data.user.id);
       if (prefs.defaultProxyMode !== undefined) {
-        setRequest(prev => ({ ...prev, useProxy: prefs.defaultProxyMode === 1 }));
+        setRequestTabs(prev => prev.map(tab => 
+          tab.id === (activeTabId || 'default')
+            ? { ...tab, request: { ...tab.request, useProxy: prefs.defaultProxyMode === 1 } }
+            : tab
+        ));
       }
       
       // Fetch user's workspaces from backend
-      const wsRes = await fetch(`http://localhost:4000/workspaces?userId=${data.user.id}`);
+      const wsRes = await fetch(`${API_BASE_URL}/workspaces?userId=${data.user.id}`);
       const wsData = await wsRes.json();
       if (wsRes.ok && wsData.workspaces) {
         const backendWorkspaces: Workspace[] = wsData.workspaces.map((ws: any) => ({
@@ -324,7 +344,7 @@ const App: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      setAuthError('Unable to reach auth server. Is the proxy server running on port 4000?');
+      setAuthError(`Unable to reach auth server. Is the proxy server running on ${API_BASE_URL}?`);
     } finally {
       setAuthLoading(false);
     }
@@ -335,7 +355,7 @@ const App: React.FC = () => {
     
     setInboxLoading(true);
     try {
-      const res = await fetch(`http://localhost:4000/invitations/${invitationId}/accept`, {
+      const res = await fetch(`${API_BASE_URL}/invitations/${invitationId}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.backendId }),
@@ -347,7 +367,7 @@ const App: React.FC = () => {
         await fetchInvitations(user.email);
         
         // Refresh workspaces list from backend
-        const wsRes = await fetch(`http://localhost:4000/workspaces?userId=${user.backendId}`);
+        const wsRes = await fetch(`${API_BASE_URL}/workspaces?userId=${user.backendId}`);
         const wsData = await wsRes.json();
         if (wsRes.ok && wsData.workspaces) {
           const backendWorkspaces: Workspace[] = wsData.workspaces.map((ws: any) => ({
@@ -382,8 +402,9 @@ const App: React.FC = () => {
             
             setSavedRequests(reqs.map((r: any) => ({
               ...r,
-              id: r.id || `req_${Date.now()}`,
+              id: String(r.id) || `req_${Date.now()}`,
               workspaceId: joinedWs.id,
+              collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
             })));
             
             setEnvironments(envs.map((e: any) => ({
@@ -417,7 +438,7 @@ const App: React.FC = () => {
     
     setInboxLoading(true);
     try {
-      const res = await fetch(`http://localhost:4000/invitations/${invitationId}/decline`, {
+      const res = await fetch(`${API_BASE_URL}/invitations/${invitationId}/decline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.backendId }),
@@ -456,7 +477,7 @@ const App: React.FC = () => {
     if (!newWorkspaceName.trim() || !user?.backendId) return;
 
     try {
-      const res = await fetch('http://localhost:4000/workspaces', {
+      const res = await fetch(`${API_BASE_URL}/workspaces`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.backendId, name: newWorkspaceName.trim() }),
@@ -576,8 +597,69 @@ const App: React.FC = () => {
   };
 
   const handleRequestChange = (next: ApiRequest) => {
-    setRequest(next);
+    setRequestTabs(prev => prev.map(tab => 
+      tab.id === activeTabId ? { ...tab, request: next } : tab
+    ));
     // Preferences are persisted via useEffect hook
+  };
+
+  // Tab Management Functions
+  const createNewTab = () => {
+    const newTabId = `tab_${Date.now()}`;
+    const newRequest: ApiRequest = {
+      ...DEFAULT_REQUEST,
+      id: newTabId,
+      name: 'New Request',
+    };
+    setRequestTabs(prev => [...prev, { id: newTabId, request: newRequest, response: null }]);
+    setActiveTabId(newTabId);
+  };
+
+  const closeTab = (tabId: string) => {
+    if (requestTabs.length === 1) {
+      // Don't close the last tab, just reset it
+      const resetRequest = { ...DEFAULT_REQUEST, id: 'default', name: 'New Request' };
+      setRequestTabs([{ id: 'default', request: resetRequest, response: null }]);
+      setActiveTabId('default');
+      return;
+    }
+    
+    const newTabs = requestTabs.filter(tab => tab.id !== tabId);
+    setRequestTabs(newTabs);
+    
+    if (activeTabId === tabId) {
+      const currentIndex = requestTabs.findIndex(tab => tab.id === tabId);
+      const newActiveIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+      setActiveTabId(newTabs[newActiveIndex]?.id || newTabs[0]?.id);
+    }
+  };
+
+  const closeOtherTabs = (keepTabId: string) => {
+    const keepTab = requestTabs.find(tab => tab.id === keepTabId);
+    if (keepTab) {
+      setRequestTabs([keepTab]);
+      setActiveTabId(keepTabId);
+    }
+  };
+
+  const duplicateTab = (tabId: string) => {
+    const tabToDuplicate = requestTabs.find(tab => tab.id === tabId);
+    if (tabToDuplicate) {
+      const newTabId = `tab_${Date.now()}`;
+      const duplicatedRequest = {
+        ...tabToDuplicate.request,
+        id: newTabId,
+        name: `${tabToDuplicate.request.name} (Copy)`,
+      };
+      setRequestTabs(prev => [...prev, { id: newTabId, request: duplicatedRequest, response: null }]);
+      setActiveTabId(newTabId);
+    }
+  };
+
+  const renameTab = (tabId: string, newName: string) => {
+    setRequestTabs(prev => prev.map(tab => 
+      tab.id === tabId ? { ...tab, request: { ...tab.request, name: newName } } : tab
+    ));
   };
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
@@ -591,7 +673,7 @@ const App: React.FC = () => {
       // Ensure workspace has a backend id; if not, create it now
       let backendId = ws.backendId;
       if (!backendId && user) {
-        const wsRes = await fetch('http://localhost:4000/workspaces', {
+        const wsRes = await fetch(`${API_BASE_URL}/workspaces`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: Number(user.id), name: ws.name }),
@@ -620,7 +702,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const res = await fetch(`http://localhost:4000/workspaces/${backendId}/invite`, {
+      const res = await fetch(`${API_BASE_URL}/workspaces/${backendId}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail, role: inviteRole, inviterId: user.backendId }),
@@ -638,29 +720,20 @@ const App: React.FC = () => {
       setInviteRole('member');
     } catch (err: any) {
       console.error('Invite error:', err);
-      setInviteError('Unable to reach server. Is the proxy server running on port 4000?');
+        setInviteError(`Unable to reach server. Is the proxy server running on ${API_BASE_URL}?`);
       setInviteLoading(false);
     }
   };
 
   const openSaveRequestModal = () => {
-    // If request already belongs to a collection, we could just update it.
-    // For now, let's treat "Save" as "Save As" logic if id doesn't match a saved request,
-    // or allow updating if it does.
+    // Check if this request is already saved
     const existing = savedRequests.find(r => r.id === request.id);
     
     if (existing) {
-        // Update existing directly? Or ask confirmation? 
-        // For simplicity, let's overwrite for now if it's already a saved request.
-        const updated: SavedRequest = {
-            ...request,
-            collectionId: existing.collectionId,
-            workspaceId: existing.workspaceId,
-            updatedAt: Date.now()
-        };
-        setSavedRequests(prev => prev.map(r => r.id === request.id ? updated : r));
-        alert("Request updated!");
+        // If it's already saved, update it directly without showing modal
+        handleUpdateRequest(existing);
     } else {
+        // Show modal for new requests
         setSaveRequestName(request.name || 'New Request');
         // Default to first collection if available
         const wsCollections = collections.filter(c => c.workspaceId === activeWorkspaceId);
@@ -668,6 +741,56 @@ const App: React.FC = () => {
             setSelectedCollectionId(wsCollections[0].id);
         }
         setShowSaveRequestModal(true);
+    }
+  };
+
+  const handleUpdateRequest = async (existingRequest?: SavedRequest) => {
+    const existing = existingRequest || savedRequests.find(r => r.id === request.id);
+    if (!existing) return;
+    
+    const activeWs = getActiveWorkspace();
+    if (!activeWs.backendId) {
+      alert('Cannot update request in Personal Workspace');
+      return;
+    }
+
+    try {
+      const collectionBackendId = existing.collectionId ? parseInt(existing.collectionId.replace('col_', '')) : null;
+      const requestId = parseInt(request.id.toString().replace('req_', ''));
+      
+      await apiService.saveRequest({
+        ...request,
+        id: requestId,
+        name: request.name || existing.name,
+        collectionId: collectionBackendId ? String(collectionBackendId) : undefined,
+        workspaceId: String(activeWs.backendId),
+      });
+      
+      // Backend returns { success: true } on update, so we use the current request data
+      const updatedSavedReq: SavedRequest = {
+        ...request,
+        id: String(requestId),
+        workspaceId: activeWorkspaceId,
+        collectionId: existing.collectionId,
+        updatedAt: Date.now(),
+      };
+      
+      setSavedRequests(prev => prev.map(r => r.id === request.id ? updatedSavedReq : r));
+      
+      // Update the tab with the saved request, preserving all request properties
+      // Don't overwrite the request, just update the saved state
+      setRequestTabs(prev => prev.map(tab => 
+        tab.id === activeTabId ? { 
+          ...tab, 
+          request: { 
+            ...tab.request, // Keep all existing request properties
+            id: String(requestId), // Update ID to match saved request
+          } 
+        } : tab
+      ));
+    } catch (err) {
+      console.error('Update request error:', err);
+      alert('Unable to update request');
     }
   };
 
@@ -682,9 +805,12 @@ const App: React.FC = () => {
 
       try {
         const collectionBackendId = parseInt(selectedCollectionId.replace('col_', ''));
+        const isUpdate = request.id && savedRequests.find(r => r.id === request.id);
+        const requestId = isUpdate ? parseInt(request.id.toString().replace('req_', '')) : undefined;
+        
         const savedReq = await apiService.saveRequest({
           ...request,
-          id: request.id?.startsWith('req_') ? request.id : undefined,
+          id: requestId,
           name: saveRequestName,
           collectionId: String(collectionBackendId),
           workspaceId: String(activeWs.backendId),
@@ -692,17 +818,27 @@ const App: React.FC = () => {
         
         const newSavedReq: SavedRequest = {
           ...savedReq,
-          id: savedReq.id || `req_${Date.now()}`,
+          id: String(savedReq.id) || `req_${Date.now()}`,
           workspaceId: activeWorkspaceId,
           collectionId: selectedCollectionId,
         };
         
-        if (request.id && savedRequests.find(r => r.id === request.id)) {
+        if (isUpdate) {
           setSavedRequests(prev => prev.map(r => r.id === request.id ? newSavedReq : r));
         } else {
           setSavedRequests([...savedRequests, newSavedReq]);
         }
-        setRequest(newSavedReq);
+        // Update the tab with the saved request, always using the saved request ID
+        // This ensures the Update button shows correctly for saved requests
+        setRequestTabs(prev => prev.map(tab => 
+          tab.id === activeTabId ? { 
+            ...tab, 
+            request: { 
+              ...newSavedReq, 
+              id: newSavedReq.id, // Always use saved request ID so Update button works correctly
+            } 
+          } : tab
+        ));
         setShowSaveRequestModal(false);
         setExpandedCollections(prev => new Set(prev).add(selectedCollectionId));
       } catch (err) {
@@ -787,7 +923,9 @@ const App: React.FC = () => {
 
   const handleSendRequest = async () => {
     setLoading(true);
-    setResponse(null);
+    setRequestTabs(prev => prev.map(tab => 
+      tab.id === activeTabId ? { ...tab, response: null } : tab
+    ));
     
     const activeWs = getActiveWorkspace();
     const timestamp = Date.now();
@@ -804,7 +942,9 @@ const App: React.FC = () => {
       const envVars = activeEnv ? activeEnv.variables : [];
 
       const result = await executeRequest(request, envVars);
-      setResponse(result);
+      setRequestTabs(prev => prev.map(tab => 
+        tab.id === activeTabId ? { ...tab, response: result } : tab
+      ));
       
       // Save to backend history if workspace has backendId
       if (activeWs.backendId && user?.backendId) {
@@ -830,13 +970,37 @@ const App: React.FC = () => {
   };
 
   const restoreRequest = (req: ApiRequest) => {
-    // Ensure new fields are initialized if restoring old request data
-    setRequest({ 
-        ...DEFAULT_REQUEST,
-        ...req, 
-        useProxy: req.useProxy ?? false 
-    }); 
-    setResponse(null);
+    // Check if this request is already open in a tab
+    // For saved requests, check by the original request ID
+    const isSavedRequest = req.id && (req.id.toString().startsWith('req_') || !isNaN(Number(req.id)));
+    
+    if (isSavedRequest) {
+      // Check if a tab with this saved request ID already exists
+      const existingTab = requestTabs.find(tab => {
+        const tabRequestId = tab.request.id;
+        return tabRequestId === req.id || 
+               (tabRequestId.toString().startsWith('req_') && tabRequestId === req.id) ||
+               (req.id.toString().startsWith('req_') && tabRequestId === req.id);
+      });
+      
+      if (existingTab) {
+        // Switch to the existing tab instead of creating a new one
+        setActiveTabId(existingTab.id);
+        return;
+      }
+    }
+    
+    // Create a new tab with the restored request
+    // Preserve the original request ID if it's a saved request
+    const newTabId = isSavedRequest ? req.id.toString() : `tab_${Date.now()}`;
+    const restoredRequest = { 
+      ...DEFAULT_REQUEST,
+      ...req, 
+      id: newTabId,
+      useProxy: req.useProxy ?? false 
+    };
+    setRequestTabs(prev => [...prev, { id: newTabId, request: restoredRequest, response: null }]);
+    setActiveTabId(newTabId);
   };
 
   const filteredHistory = history.filter(h => 
@@ -936,24 +1100,35 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-background text-zinc-100 overflow-hidden font-sans">
       {/* Sidebar */}
-      <div className="w-72 bg-surface border-r border-border flex flex-col z-20">
+      <div className="w-72 bg-surface border-r border-border flex flex-col relative z-10">
         {/* Workspace Switcher Header */}
         <div className="p-4 border-b border-border relative">
-           <button 
-             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-             className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surfaceLight transition-colors group"
-           >
-             <div className="flex items-center gap-3">
-               <div className="w-8 h-8 rounded-lg bg-surfaceHighlight border border-border flex items-center justify-center text-primary">
-                 <Box size={18} />
+           <div className="flex items-center gap-2">
+             <button 
+               onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
+               className="flex-1 flex items-center justify-between p-2 rounded-lg hover:bg-surfaceLight transition-colors group"
+             >
+               <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-lg bg-surfaceHighlight border border-border flex items-center justify-center text-primary">
+                   <Box size={18} />
+                 </div>
+                 <div className="flex flex-col items-start">
+                   <span className="text-xs text-textSecondary font-medium">Workspace</span>
+                   <span className="text-sm font-bold text-white truncate max-w-[140px]">{activeWorkspace.name}</span>
+                 </div>
                </div>
-               <div className="flex flex-col items-start">
-                 <span className="text-xs text-textSecondary font-medium">Workspace</span>
-                 <span className="text-sm font-bold text-white truncate max-w-[140px]">{activeWorkspace.name}</span>
-               </div>
-             </div>
-             <ChevronDown size={16} className={`text-textSecondary transition-transform ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
-           </button>
+               <ChevronDown size={16} className={`text-textSecondary transition-transform ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
+             </button>
+             {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+               <button
+                 onClick={() => setShowInviteModal(true)}
+                 className="p-2 rounded-lg text-textSecondary hover:text-primary hover:bg-surfaceLight transition-colors"
+                 title="Invite a collaborator to this workspace"
+               >
+                 <Mail size={16} />
+               </button>
+             )}
+           </div>
 
            {/* Dropdown Menu */}
            {showWorkspaceMenu && (
@@ -964,7 +1139,7 @@ const App: React.FC = () => {
                     {workspaces.map(ws => (
                       <div
                         key={ws.id}
-                        className={`group flex items-center gap-1 p-2 rounded-lg mb-1 ${activeWorkspaceId === ws.id ? 'bg-surfaceLight' : 'hover:bg-surfaceLight/50'}`}
+                        className={`group flex items-center gap-2 p-2.5 rounded-lg mb-1 transition-colors ${activeWorkspaceId === ws.id ? 'bg-surfaceLight' : 'hover:bg-surfaceLight/50'}`}
                       >
                         <button
                           onClick={async () => {
@@ -989,8 +1164,9 @@ const App: React.FC = () => {
                                 
                                 setSavedRequests(reqs.map((r: any) => ({
                                   ...r,
-                                  id: r.id || `req_${Date.now()}`,
+                                  id: String(r.id) || `req_${Date.now()}`,
                                   workspaceId: ws.id,
+                                  collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
                                 })));
                                 
                                 setEnvironments(envs.map((e: any) => ({
@@ -1025,7 +1201,11 @@ const App: React.FC = () => {
                               setActiveEnvId(null);
                             }
                           }}
-                          className={`flex-1 flex items-center justify-between text-sm ${activeWorkspaceId === ws.id ? 'text-white' : 'text-textSecondary hover:text-white'}`}
+                          className={`flex-1 flex items-center justify-between px-2 py-1.5 rounded-lg text-sm transition-all ${
+                            activeWorkspaceId === ws.id 
+                              ? 'text-white font-medium' 
+                              : 'text-textSecondary hover:text-white'
+                          }`}
                         >
                           <span>{ws.name}</span>
                           {activeWorkspaceId === ws.id && <Check size={14} className="text-primary" />}
@@ -1041,7 +1221,7 @@ const App: React.FC = () => {
                               if (!user?.backendId) return;
                               
                               try {
-                                const res = await fetch(`http://localhost:4000/workspaces/${ws.backendId}`, {
+                                const res = await fetch(`${API_BASE_URL}/workspaces/${ws.backendId}`, {
                                   method: 'DELETE',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ userId: user.backendId }),
@@ -1076,8 +1256,9 @@ const App: React.FC = () => {
                                         
                                         setSavedRequests(reqs.map((r: any) => ({
                                           ...r,
-                                          id: r.id || `req_${Date.now()}`,
+                                          id: String(r.id) || `req_${Date.now()}`,
                                           workspaceId: newActive.id,
+                                          collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
                                         })));
                                         
                                         setEnvironments(envs.map((e: any) => ({
@@ -1110,7 +1291,7 @@ const App: React.FC = () => {
                                 alert('Unable to delete workspace');
                               }
                             }}
-                            className="opacity-0 group-hover:opacity-100 text-textSecondary hover:text-danger transition-opacity p-1"
+                            className="opacity-0 group-hover:opacity-100 text-textSecondary hover:text-danger transition-opacity p-1.5 rounded hover:bg-surfaceLight/30"
                             title="Delete workspace"
                           >
                             <Trash2 size={12} />
@@ -1119,13 +1300,13 @@ const App: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="p-2 border-t border-border bg-surfaceLight/30">
+                  <div className="p-3 border-t border-border/50 bg-surfaceLight/20">
                     <button
                       onClick={() => {
                         setShowCreateWorkspaceModal(true);
                         setShowWorkspaceMenu(false);
                       }} 
-                      className="w-full flex items-center gap-2 p-2 rounded-lg text-sm text-primary hover:bg-primary/10 transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
                     >
                       <Plus size={14} />
                       <span>New Workspace</span>
@@ -1136,50 +1317,142 @@ const App: React.FC = () => {
            )}
         </div>
 
+        {/* Environment Section - Collapsible */}
+        <div className="border-b border-border/50 bg-surface">
+          <div className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-surfaceLight/30 transition-colors group">
+            <button
+              onClick={() => setIsEnvExpanded(!isEnvExpanded)}
+              className="flex-1 flex items-center gap-2 text-left"
+            >
+              <ChevronRight size={14} className={`text-textSecondary transition-transform ${isEnvExpanded ? 'rotate-90' : ''}`} />
+              <Database size={14} className={activeEnvId ? "text-primary" : "text-textSecondary"} />
+              <span className="text-xs font-semibold uppercase tracking-wider text-textSecondary">Environment</span>
+              {activeEnvId && (
+                <span className="text-xs text-primary font-medium truncate max-w-[100px]">
+                  ({environments.find(e => e.id === activeEnvId)?.name || 'Active'})
+                </span>
+              )}
+            </button>
+            {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCreateEnvironment();
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 text-textSecondary hover:text-primary transition-opacity rounded hover:bg-surfaceLight/30"
+                title="New Environment"
+              >
+                <Plus size={12} />
+              </button>
+            )}
+          </div>
+          
+          {isEnvExpanded && (
+            <div className="px-4 pb-3 space-y-1.5">
+              <button
+                onClick={() => setActiveEnvId(null)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all ${
+                  !activeEnvId 
+                    ? 'bg-surfaceLight/80 text-white shadow-sm' 
+                    : 'text-textSecondary hover:text-white hover:bg-surfaceLight/30'
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <Database size={13} className={!activeEnvId ? "text-primary" : "text-textSecondary"} />
+                  <span className="font-medium">No Environment</span>
+                </span>
+                {!activeEnvId && <Check size={13} className="text-primary" />}
+              </button>
+              {environments.map(env => (
+                <button
+                  key={env.id}
+                  onClick={() => setActiveEnvId(env.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all group ${
+                    activeEnvId === env.id 
+                      ? 'bg-surfaceLight/80 text-white shadow-sm' 
+                      : 'text-textSecondary hover:text-white hover:bg-surfaceLight/30'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5 truncate">
+                    <Database size={13} className={activeEnvId === env.id ? "text-primary" : "text-textSecondary"} />
+                    <span className="font-medium truncate">{env.name}</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {activeEnvId === env.id && <Check size={13} className="text-primary" />}
+                    {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingEnvId(env.id);
+                          setShowEnvModal(true);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-textSecondary hover:text-primary transition-opacity rounded hover:bg-surfaceLight/30"
+                        title="Edit environment"
+                      >
+                        <Settings size={11} />
+                      </button>
+                    )}
+                  </div>
+                </button>
+              ))}
+              {environments.length === 0 && activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+                <div className="text-[10px] text-textSecondary px-3 py-2 italic text-center">
+                  No environments. Create one to manage variables.
+                </div>
+              )}
+              {activeWorkspaceId !== DEFAULT_WORKSPACE.id && environments.length > 0 && (
+                <button
+                  onClick={() => setShowEnvModal(true)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 mt-2 text-xs text-primary hover:bg-primary/10 rounded-lg transition-colors border border-primary/30"
+                >
+                  <Settings size={11} />
+                  Manage Environments
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Sidebar View Switcher */}
-        <div className="flex p-2 gap-1 border-b border-border bg-surface">
+        <div className="flex p-2 gap-1 border-b border-border/50 bg-surface">
             <button 
                 onClick={() => setSidebarView('collections')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${sidebarView === 'collections' ? 'bg-surfaceHighlight text-white' : 'text-textSecondary hover:text-zinc-300'}`}
+                className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${
+                  sidebarView === 'collections' 
+                    ? 'bg-surfaceHighlight text-primary' 
+                    : 'text-textSecondary hover:text-white hover:bg-surfaceLight/30'
+                }`}
+                title="Collections"
             >
-                <Folder size={14} /> Collections
+                <Folder size={16} />
             </button>
             <button 
                 onClick={() => setSidebarView('history')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${sidebarView === 'history' ? 'bg-surfaceHighlight text-white' : 'text-textSecondary hover:text-zinc-300'}`}
+                className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${
+                  sidebarView === 'history' 
+                    ? 'bg-surfaceHighlight text-primary' 
+                    : 'text-textSecondary hover:text-white hover:bg-surfaceLight/30'
+                }`}
+                title="History"
             >
-                <Clock size={14} /> History
+                <Clock size={16} />
             </button>
         </div>
-        
-        {/* Invite Button - Only for non-Personal workspaces */}
-        {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
-          <div className="px-2 pb-2 border-b border-border">
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-primary border border-primary/40 hover:bg-primary/10 transition-colors"
-              title="Invite a collaborator to this workspace"
-            >
-              <Plus size={12} />
-              Invite
-            </button>
-          </div>
-        )}
 
         {/* Sidebar Content */}
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar">
           
           {/* HISTORY VIEW */}
           {sidebarView === 'history' && (
-             <ul className="space-y-1">
+             <ul className="space-y-2">
                {filteredHistory.map((item) => (
                  <li key={item.id}>
                    <button 
                      onClick={() => restoreRequest(item.request)}
-                     className="w-full text-left p-3 rounded-lg hover:bg-surfaceLight border border-transparent hover:border-border transition-all group relative overflow-hidden"
+                     className="w-full text-left p-3 rounded-lg hover:bg-surfaceLight/50 border border-transparent hover:border-border/50 transition-all group relative overflow-hidden"
                    >
-                     <div className="flex items-center justify-between mb-1.5">
-                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                     <div className="flex items-center justify-between mb-2">
+                       <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
                          item.request.method === 'GET' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
                          item.request.method === 'POST' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
                          item.request.method === 'DELETE' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 
@@ -1187,7 +1460,7 @@ const App: React.FC = () => {
                        }`}>
                          {item.request.method}
                        </span>
-                       <span className={`text-[10px] font-mono ${item.responseStatus && item.responseStatus >= 400 ? 'text-danger' : 'text-success'}`}>
+                       <span className={`text-[10px] font-mono font-semibold ${item.responseStatus && item.responseStatus >= 400 ? 'text-danger' : 'text-success'}`}>
                          {item.responseStatus || '...'}
                        </span>
                      </div>
@@ -1198,7 +1471,7 @@ const App: React.FC = () => {
                  </li>
                ))}
                {filteredHistory.length === 0 && (
-                  <li className="p-8 text-center border border-dashed border-border rounded-lg">
+                  <li className="p-8 text-center border border-dashed border-border/50 rounded-lg">
                    <p className="text-xs text-textSecondary">No history in this workspace.</p>
                  </li>
                )}
@@ -1207,16 +1480,19 @@ const App: React.FC = () => {
 
           {/* COLLECTIONS VIEW */}
           {sidebarView === 'collections' && (
-             <div className="space-y-4">
-                 <button 
-                    onClick={() => setShowCreateCollectionModal(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-border rounded-lg text-textSecondary hover:text-primary hover:border-primary/50 transition-colors text-xs font-bold uppercase tracking-wider"
-                 >
-                    <Plus size={14} /> New Collection
-                 </button>
+             <div className="space-y-3">
+                 {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+                   <button 
+                      onClick={() => setShowCreateCollectionModal(true)}
+                      className="w-full flex items-center justify-center p-2 border border-dashed border-border/50 rounded-lg text-textSecondary hover:text-primary hover:border-primary/50 hover:bg-surfaceLight/20 transition-all"
+                      title="New Collection"
+                   >
+                      <Plus size={16} />
+                   </button>
+                 )}
 
                  {filteredCollections.length === 0 && (
-                     <div className="text-center text-xs text-textSecondary italic py-4">Create a collection to organize your requests.</div>
+                     <div className="text-center text-xs text-textSecondary italic py-6">Create a collection to organize your requests.</div>
                  )}
 
                  {filteredCollections.map(col => {
@@ -1225,10 +1501,16 @@ const App: React.FC = () => {
                      
                      return (
                          <div key={col.id} className="group/col">
-                             <div className="flex items-center justify-between mb-1 p-1 pr-2 rounded-md hover:bg-surfaceLight/50 group/header">
+                             <div 
+                                className="flex items-center justify-between mb-2 p-2 rounded-lg hover:bg-surfaceLight/30 group/header transition-colors"
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  setCollectionContextMenu({ x: e.clientX, y: e.clientY, collectionId: col.id });
+                                }}
+                             >
                                  <button 
                                     onClick={() => toggleCollection(col.id)}
-                                    className="flex items-center gap-2 flex-1 overflow-hidden"
+                                    className="flex items-center gap-2.5 flex-1 overflow-hidden"
                                  >
                                      <ChevronRight size={14} className={`text-textSecondary transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                      {isExpanded ? <FolderOpen size={16} className="text-primary" /> : <Folder size={16} className="text-primary/70" />}
@@ -1236,24 +1518,24 @@ const App: React.FC = () => {
                                  </button>
                                  <button 
                                     onClick={() => deleteCollection(col.id)}
-                                    className="opacity-0 group-hover/header:opacity-100 text-textSecondary hover:text-danger transition-opacity p-1"
+                                    className="opacity-0 group-hover/header:opacity-100 text-textSecondary hover:text-danger transition-opacity p-1.5 rounded hover:bg-surfaceLight/50"
                                  >
-                                    <Trash2 size={12} />
+                                    <Trash2 size={13} />
                                  </button>
                              </div>
 
                              {isExpanded && (
-                                 <div className="pl-4 border-l border-border/50 ml-2 space-y-0.5">
+                                 <div className="pl-5 border-l border-border/30 ml-3 space-y-1">
                                      {colRequests.length === 0 && (
-                                         <div className="text-[10px] text-textSecondary pl-4 py-1 italic">Empty collection</div>
+                                         <div className="text-[10px] text-textSecondary pl-4 py-2 italic">Empty collection</div>
                                      )}
-                                     {colRequests.map(req => (
+                                     {colRequests.filter(req => req && req.id).map(req => (
                                          <div key={req.id} className="flex items-center group/req">
                                             <button
                                                onClick={() => restoreRequest(req)}
-                                               className={`flex-1 flex items-center gap-2 p-1.5 rounded-md hover:bg-surfaceLight text-left overflow-hidden ${request.id === req.id ? 'bg-surfaceLight ring-1 ring-border' : ''}`}
+                                               className={`flex-1 flex items-center gap-2.5 p-2 rounded-lg hover:bg-surfaceLight/50 text-left overflow-hidden transition-all ${request.id === req.id ? 'bg-surfaceLight/50 ring-1 ring-border/50' : ''}`}
                                             >
-                                                <span className={`text-[9px] font-bold w-8 text-center rounded px-0.5 py-0.5 ${
+                                                <span className={`text-[9px] font-bold w-9 text-center rounded px-1 py-0.5 ${
                                                     req.method === 'GET' ? 'text-blue-400 bg-blue-400/10' :
                                                     req.method === 'POST' ? 'text-emerald-400 bg-emerald-400/10' :
                                                     req.method === 'DELETE' ? 'text-red-400 bg-red-400/10' :
@@ -1261,11 +1543,11 @@ const App: React.FC = () => {
                                                 }`}>
                                                     {req.method}
                                                 </span>
-                                                <span className="text-xs text-zinc-300 truncate">{req.name}</span>
+                                                <span className="text-xs text-zinc-300 truncate font-medium">{req.name}</span>
                                             </button>
                                             <button 
                                                 onClick={() => deleteSavedRequest(req.id)}
-                                                className="opacity-0 group-hover/req:opacity-100 p-1.5 text-textSecondary hover:text-danger"
+                                                className="opacity-0 group-hover/req:opacity-100 p-1.5 text-textSecondary hover:text-danger rounded transition-opacity hover:bg-surfaceLight/30"
                                             >
                                                 <Trash2 size={12} />
                                             </button>
@@ -1282,7 +1564,7 @@ const App: React.FC = () => {
         </div>
 
         {/* User Footer */}
-        <div className="p-4 m-4 mt-2 bg-surfaceLight border border-border rounded-xl">
+        <div className="p-4 mx-4 mb-4 mt-auto bg-surfaceLight/50 border border-border/50 rounded-xl">
            <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-orange-900/20">
@@ -1322,66 +1604,232 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background relative">
+      <div className="flex-1 flex flex-col min-w-0 bg-background relative z-20">
         {/* Background gradient spot */}
         <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-surfaceHighlight/20 to-transparent pointer-events-none"></div>
         
-        {/* Environment Selector (Floating Top Right) */}
-        <div className="absolute top-4 right-4 z-20">
-           <div className="relative">
-             <button
-               onClick={() => setShowEnvMenu(!showEnvMenu)}
-               className="flex items-center gap-2 pl-3 pr-2 py-1.5 bg-surface border border-border rounded-lg hover:border-primary/50 transition-colors shadow-lg"
-             >
-                <Database size={14} className={activeEnvId ? "text-primary" : "text-textSecondary"} />
-                <span className={`text-xs font-medium ${activeEnvId ? "text-white" : "text-textSecondary"}`}>
-                   {activeEnvironment ? activeEnvironment.name : "No Environment"}
+
+        <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden z-0">
+          {/* Request Tabs Bar */}
+          <div className="flex items-center gap-1 bg-surface border border-border rounded-lg overflow-x-auto custom-scrollbar">
+            {requestTabs.map((tab) => (
+              <div
+                key={tab.id}
+                className={`group flex items-center gap-2 px-3 py-2 rounded-md transition-all min-w-[100px] max-w-[180px] relative ${
+                  activeTabId === tab.id
+                    ? 'bg-surfaceLight/80 text-white'
+                    : 'text-textSecondary hover:text-white hover:bg-surfaceLight/30'
+                }`}
+                onClick={() => setActiveTabId(tab.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
+                }}
+              >
+                {activeTabId === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"></div>
+                )}
+                <span className={`text-xs font-medium truncate flex-1 ${
+                  activeTabId === tab.id ? 'text-white' : 'text-textSecondary'
+                }`}>
+                  {tab.request.name}
                 </span>
-                <ChevronDown size={14} className="text-textSecondary" />
-             </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTab(tab.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-surfaceLight/50 rounded transition-all flex-shrink-0"
+                  title="Close tab"
+                >
+                  <X size={12} className="text-textSecondary hover:text-white" />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={createNewTab}
+              className="px-2 py-2 text-textSecondary hover:text-white hover:bg-surfaceLight/30 rounded-md transition-all flex items-center justify-center flex-shrink-0"
+              title="New Request"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
 
-             {showEnvMenu && (
-               <>
-                 <div className="fixed inset-0" onClick={() => setShowEnvMenu(false)}></div>
-                 <div className="absolute top-full right-0 mt-2 w-56 bg-surfaceHighlight border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-                    <div className="p-1.5">
-                       <button
-                          onClick={() => { setActiveEnvId(null); setShowEnvMenu(false); }}
-                          className={`w-full flex items-center justify-between p-2 rounded-md text-xs mb-1 ${!activeEnvId ? 'bg-surfaceLight text-white' : 'text-textSecondary hover:text-white hover:bg-surfaceLight/50'}`}
-                       >
-                         <span>No Environment</span>
-                         {!activeEnvId && <Check size={12} className="text-primary" />}
-                       </button>
-                       <div className="h-px bg-border my-1"></div>
-                       {environments.map(env => (
-                          <button
-                            key={env.id}
-                            onClick={() => { setActiveEnvId(env.id); setShowEnvMenu(false); }}
-                            className={`w-full flex items-center justify-between p-2 rounded-md text-xs mb-1 ${activeEnvId === env.id ? 'bg-surfaceLight text-white' : 'text-textSecondary hover:text-white hover:bg-surfaceLight/50'}`}
-                          >
-                            <span className="truncate">{env.name}</span>
-                            {activeEnvId === env.id && <Check size={12} className="text-primary" />}
-                          </button>
-                       ))}
-                    </div>
-                    <div className="p-2 border-t border-border bg-surfaceLight/30">
-                       <button
-                         onClick={() => { setShowEnvModal(true); setShowEnvMenu(false); }}
-                         className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 transition-colors justify-center"
-                       >
-                         <Settings size={12} />
-                         Manage Environments
-                       </button>
-                    </div>
-                 </div>
-               </>
-             )}
-           </div>
-        </div>
+          {/* Context Menu */}
+          {contextMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-50"
+                onClick={() => setContextMenu(null)}
+              />
+              <div
+                className="fixed z-50 bg-surface border border-border rounded-lg shadow-xl py-1 min-w-[180px]"
+                style={{ left: contextMenu.x, top: contextMenu.y }}
+              >
+                <button
+                  onClick={() => {
+                    const tab = requestTabs.find(t => t.id === contextMenu.tabId);
+                    if (tab) {
+                      const newName = prompt('Rename request:', tab.request.name);
+                      if (newName) renameTab(contextMenu.tabId, newName);
+                    }
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-textSecondary hover:text-white hover:bg-surfaceLight transition-colors"
+                >
+                  <Edit size={14} />
+                  Rename Request
+                </button>
+                <button
+                  onClick={() => {
+                    duplicateTab(contextMenu.tabId);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-textSecondary hover:text-white hover:bg-surfaceLight transition-colors"
+                >
+                  <Copy size={14} />
+                  Duplicate Tab
+                </button>
+                <div className="h-px bg-border my-1" />
+                <button
+                  onClick={() => {
+                    closeTab(contextMenu.tabId);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-textSecondary hover:text-white hover:bg-surfaceLight transition-colors"
+                >
+                  <X size={14} />
+                  Close Tab
+                </button>
+                <button
+                  onClick={() => {
+                    closeOtherTabs(contextMenu.tabId);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-textSecondary hover:text-white hover:bg-surfaceLight transition-colors"
+                >
+                  <X size={14} />
+                  Close Other Tabs
+                </button>
+              </div>
+            </>
+          )}
 
-        <div className="flex-1 flex p-4 gap-4 overflow-hidden z-10 pt-16">
+          {/* Collection Context Menu */}
+          {collectionContextMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-[55]"
+                onClick={() => setCollectionContextMenu(null)}
+              />
+              <div
+                className="fixed z-[60] bg-surface border border-border rounded-lg shadow-xl py-1 min-w-[180px]"
+                style={{ left: collectionContextMenu.x, top: collectionContextMenu.y }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const collection = collections.find(c => c.id === collectionContextMenu.collectionId);
+                    if (collection && activeWorkspaceId !== DEFAULT_WORKSPACE.id) {
+                      const newTabId = `tab_${Date.now()}`;
+                      const newRequest: ApiRequest = {
+                        ...DEFAULT_REQUEST,
+                        id: newTabId,
+                        name: 'New Request',
+                      };
+                      setRequestTabs(prev => [...prev, { id: newTabId, request: newRequest, response: null }]);
+                      setActiveTabId(newTabId);
+                      setSelectedCollectionId(collectionContextMenu.collectionId);
+                    }
+                    setCollectionContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-textSecondary hover:text-white hover:bg-surfaceLight transition-colors"
+                >
+                  <Plus size={14} />
+                  New Request
+                </button>
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Rename button clicked!');
+                    
+                    const collection = collections.find(c => c.id === collectionContextMenu.collectionId);
+                    console.log('Found collection:', collection, 'collectionId:', collectionContextMenu.collectionId);
+                    
+                    if (!collection) {
+                      console.error('Collection not found:', collectionContextMenu.collectionId);
+                      setCollectionContextMenu(null);
+                      return;
+                    }
+                    
+                    if (activeWorkspaceId === DEFAULT_WORKSPACE.id) {
+                      alert('Cannot rename collections in the default workspace');
+                      setCollectionContextMenu(null);
+                      return;
+                    }
+                    
+                    const newName = prompt('Rename collection:', collection.name);
+                    if (!newName || !newName.trim()) {
+                      setCollectionContextMenu(null);
+                      return;
+                    }
+                    
+                    if (newName.trim() === collection.name) {
+                      setCollectionContextMenu(null);
+                      return;
+                    }
+                    
+                    try {
+                      const backendId = parseInt(collection.id.replace('col_', ''));
+                      console.log('Renaming collection:', { collectionId: collection.id, backendId, newName: newName.trim() });
+                      
+                      if (isNaN(backendId)) {
+                        throw new Error(`Invalid collection ID: ${collection.id}`);
+                      }
+                      
+                      const updated = await apiService.updateCollection(backendId, newName.trim());
+                      console.log('Collection renamed successfully:', updated);
+                      
+                      setCollections(prev => prev.map(c => 
+                        c.id === collection.id ? { ...c, name: newName.trim() } : c
+                      ));
+                    } catch (err) {
+                      console.error('Rename collection error:', err);
+                      alert(`Unable to rename collection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                    }
+                    setCollectionContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-textSecondary hover:text-white hover:bg-surfaceLight transition-colors cursor-pointer"
+                >
+                  <Edit size={14} />
+                  Rename Collection
+                </button>
+                <div className="h-px bg-border my-1" />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteCollection(collectionContextMenu.collectionId);
+                    setCollectionContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-danger hover:text-danger hover:bg-surfaceLight transition-colors"
+                >
+                  <Trash2 size={14} />
+                  Delete Collection
+                </button>
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-4 overflow-hidden flex-1">
           {/* Request Panel (Left/Top) */}
-          <div className="w-1/2 flex flex-col min-w-[400px] bg-surface border border-border rounded-2xl shadow-xl overflow-hidden">
+          <div className="w-1/2 flex flex-col min-w-[400px] bg-surface border border-border rounded-2xl shadow-xl overflow-hidden relative">
             <RequestPanel 
               request={request}
               onRequestChange={handleRequestChange}
@@ -1389,12 +1837,14 @@ const App: React.FC = () => {
               onSave={openSaveRequestModal}
               loading={loading}
               environmentVariables={activeEnvVars}
+              isSavedRequest={!!(request.id && savedRequests.find(r => r.id === request.id))}
             />
           </div>
           
           {/* Response Panel (Right/Bottom) */}
           <div className="w-1/2 flex flex-col min-w-[400px] bg-surface border border-border rounded-2xl shadow-xl overflow-hidden">
              <ResponsePanel response={response} loading={loading} />
+          </div>
           </div>
         </div>
       </div>
@@ -1629,9 +2079,15 @@ const App: React.FC = () => {
           <div className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-2xl p-6 animate-in fade-in zoom-in-95">
              <div className="flex items-center gap-2 mb-1 text-primary">
                  <Save size={20} />
-                 <h2 className="text-xl font-bold text-white">Save Request</h2>
+                 <h2 className="text-xl font-bold text-white">
+                   {request.id && savedRequests.find(r => r.id === request.id) ? 'Update Request' : 'Save Request'}
+                 </h2>
              </div>
-             <p className="text-sm text-textSecondary mb-6">Save this request to a collection for later use.</p>
+             <p className="text-sm text-textSecondary mb-6">
+               {request.id && savedRequests.find(r => r.id === request.id) 
+                 ? 'Update this saved request with your changes.' 
+                 : 'Save this request to a collection for later use.'}
+             </p>
              
              <form onSubmit={handleSaveRequest}>
                <div className="mb-4">
@@ -1704,7 +2160,7 @@ const App: React.FC = () => {
                    disabled={!selectedCollectionId}
                    className="px-4 py-2 rounded-lg text-sm font-bold bg-primary text-white hover:bg-primaryHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                  >
-                   Save
+                   {request.id && savedRequests.find(r => r.id === request.id) ? 'Update' : 'Save'}
                  </button>
                </div>
              </form>

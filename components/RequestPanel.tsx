@@ -15,9 +15,10 @@ interface RequestPanelProps {
   onSave: () => void;
   loading: boolean;
   environmentVariables?: KeyValueItem[];
+  isSavedRequest?: boolean;
 }
 
-const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, onSend, onSave, loading, environmentVariables = [] }) => {
+const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, onSend, onSave, loading, environmentVariables = [], isSavedRequest = false }) => {
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body'>('params');
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [codeLang, setCodeLang] = useState<'curl' | 'js' | 'python'>('curl');
@@ -117,10 +118,10 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
           <button 
             onClick={onSave}
             className="px-4 bg-surfaceHighlight hover:bg-surfaceLight border border-border text-zinc-200 font-bold rounded-lg flex items-center gap-2 transition-all active:scale-95"
-            title="Save to Collection"
+            title={isSavedRequest ? "Update Request" : "Save to Collection"}
           >
              <Save size={16} />
-             <span className="hidden xl:inline">Save</span>
+             <span className="hidden xl:inline">{isSavedRequest ? 'Update' : 'Save'}</span>
           </button>
 
           <button 
@@ -139,7 +140,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
       </div>
 
       {/* Configuration Tabs */}
-      <div className="flex px-2 pt-2 border-b border-border bg-surface">
+      <div className="flex px-2 pt-2 border-b border-border bg-surface relative z-30">
         {[
           { id: 'params', label: 'Params', icon: Link },
           { id: 'headers', label: 'Headers', icon: Layers },
@@ -157,8 +158,8 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
           >
             <tab.icon size={14} className={activeTab === tab.id ? 'text-primary' : ''} />
             {tab.label}
-            {tab.id === 'params' && request.params.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
-            {tab.id === 'headers' && request.headers.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
+            {tab.id === 'params' && request.params && request.params.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
+            {tab.id === 'headers' && request.headers && request.headers.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
           </button>
         ))}
       </div>

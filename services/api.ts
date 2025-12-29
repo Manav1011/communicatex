@@ -1,4 +1,7 @@
-const API_BASE = 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4001';
+
+// Export API_BASE for use in other files
+export const API_BASE_URL = API_BASE;
 
 export const apiService = {
   // User preferences
@@ -33,6 +36,16 @@ export const apiService = {
     });
     const data = await res.json();
     return data.collection;
+  },
+
+  async updateCollection(id: number, name: string) {
+    const res = await fetch(`${API_BASE}/collections/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    return data.collection || data;
   },
 
   async deleteCollection(id: number) {

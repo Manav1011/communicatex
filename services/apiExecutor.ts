@@ -11,8 +11,10 @@ const interpolate = (text: string, variables: Record<string, string>): string =>
   });
 };
 
+import { API_BASE_URL } from './api';
+
 // Backend proxy server (see server.js). Keep port in sync with that file.
-const PROXY_URL = 'http://localhost:4000/proxy';
+const PROXY_URL = `${API_BASE_URL}/proxy`;
 
 export const executeRequest = async (request: ApiRequest, environmentVariables: KeyValueItem[] = []): Promise<ApiResponse> => {
   const startTime = performance.now();
