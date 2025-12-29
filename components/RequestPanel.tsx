@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { ApiRequest, HttpMethod, KeyValueItem, AuthMethod } from '../types';
-import { Play, Save, ChevronDown, Layers, Shield, FileJson, Link } from 'lucide-react';
+import { Play, Save, Layers, Shield, FileJson, Link, ChevronDown } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
 import AutocompleteInput from './AutocompleteInput';
+import CustomSelect from './CustomSelect';
 
 interface RequestPanelProps {
   request: ApiRequest;
@@ -16,8 +17,8 @@ interface RequestPanelProps {
 const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, onSend, onSave, loading, environmentVariables = [] }) => {
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body'>('params');
 
-  const handleMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onRequestChange({ ...request, method: e.target.value as HttpMethod });
+  const handleMethodChange = (val: string) => {
+    onRequestChange({ ...request, method: val as HttpMethod });
   };
 
   const handleUrlChange = (value: string) => {
@@ -27,7 +28,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
   const updateParams = (items: KeyValueItem[]) => onRequestChange({ ...request, params: items });
   const updateHeaders = (items: KeyValueItem[]) => onRequestChange({ ...request, headers: items });
   
-  const getMethodColor = (m: HttpMethod) => {
+  const getMethodColor = (m: string) => {
     switch (m) {
       case HttpMethod.GET: return 'text-blue-500';
       case HttpMethod.POST: return 'text-emerald-500';
@@ -38,23 +39,34 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
     }
   };
 
+  const methodOptions = Object.values(HttpMethod).map(m => ({
+    value: m,
+    label: m,
+    className: getMethodColor(m) + ' font-bold'
+  }));
+
+  const authOptions = [
+    { value: AuthMethod.NONE, label: 'No Authentication' },
+    { value: AuthMethod.BEARER, label: 'Bearer Token' },
+    { value: AuthMethod.BASIC, label: 'Basic Auth' },
+    { value: AuthMethod.API_KEY, label: 'API Key' },
+  ];
+
   return (
     <div className="flex flex-col h-full bg-surface">
       {/* Top Bar: Method & URL */}
       <div className="p-4 border-b border-border bg-surface/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex gap-2 h-11">
           <div className="flex-1 flex bg-surfaceLight border border-border rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all z-20">
-            <div className="relative border-r border-border h-full flex items-center">
-              <select 
-                value={request.method}
-                onChange={handleMethodChange}
-                className={`h-full pl-4 pr-8 bg-transparent appearance-none font-bold text-sm focus:outline-none cursor-pointer ${getMethodColor(request.method)}`}
-              >
-                {Object.values(HttpMethod).map(m => (
-                  <option key={m} value={m} className="bg-surface text-white">{m}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-2 text-textSecondary pointer-events-none" />
+            {/* Method Selector */}
+            <div className="border-r border-border h-full min-w-[110px]">
+               <CustomSelect 
+                 value={request.method}
+                 onChange={handleMethodChange}
+                 options={methodOptions}
+                 className={`w-full h-full px-4 font-bold text-sm ${getMethodColor(request.method)}`}
+                 dropdownClassName="w-32"
+               />
             </div>
 
             <div className="flex-1 h-full min-w-0">
@@ -142,19 +154,12 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
             <div className="h-full flex flex-col max-w-xl animate-in fade-in duration-300">
               <div className="mb-6">
                   <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Authentication Type</label>
-                  <div className="relative">
-                    <select 
-                      value={request.auth.type}
-                      onChange={(e) => onRequestChange({...request, auth: { ...request.auth, type: e.target.value as AuthMethod }})}
-                      className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-sm text-zinc-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer"
-                    >
-                      <option value={AuthMethod.NONE}>No Authentication</option>
-                      <option value={AuthMethod.BEARER}>Bearer Token</option>
-                      <option value={AuthMethod.BASIC}>Basic Auth</option>
-                      <option value={AuthMethod.API_KEY}>API Key</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 top-3.5 text-textSecondary pointer-events-none" />
-                  </div>
+                  <CustomSelect 
+                    value={request.auth.type}
+                    onChange={(val) => onRequestChange({...request, auth: { ...request.auth, type: val as AuthMethod }})}
+                    options={authOptions}
+                    className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-sm text-zinc-200"
+                  />
               </div>
 
               {request.auth.type === AuthMethod.BEARER && (
