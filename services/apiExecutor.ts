@@ -11,7 +11,8 @@ const interpolate = (text: string, variables: Record<string, string>): string =>
   });
 };
 
-const PROXY_URL = 'http://localhost:3001/proxy';
+// Backend proxy server (see server.js). Keep port in sync with that file.
+const PROXY_URL = 'http://localhost:4000/proxy';
 
 export const executeRequest = async (request: ApiRequest, environmentVariables: KeyValueItem[] = []): Promise<ApiResponse> => {
   const startTime = performance.now();
@@ -102,8 +103,13 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
     } else if (request.bodyType === 'form-data') {
       const formData = new FormData();
       request.multipartParams.forEach(p => {
-        if (p.enabled && p.key) {
-           formData.append(interpolate(p.key, varMap), interpolate(p.value, varMap));
+        if (!p.enabled || !p.key) return;
+        const key = interpolate(p.key, varMap);
+
+        if (p.valueType === 'file' && p.file) {
+          formData.append(key, p.file, p.file.name);
+        } else {
+          formData.append(key, interpolate(p.value, varMap));
         }
       });
       body = formData;
@@ -141,16 +147,9 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
       let proxyBody = body;
       
       if (request.bodyType === 'form-data' && body instanceof FormData) {
-          // Flatten FormData to object for proxy
-          const obj: any = {};
-          body.forEach((value, key) => {
-             obj[key] = value; 
-          });
-          proxyBody = JSON.stringify(obj);
-          // Force JSON header for proxy to understand it's a payload to forward
-          // However, server.js expects 'body' field.
-          // For real multipart support via proxy, server.js needs multer. 
-          // Simplified approach: Send as JSON, let server try to handle or just warn user.
+        // Full multipart with real files via proxy is not yet supported.
+        // This avoids silently stripping files; instead we guide the user.
+        throw new Error('File uploads are not supported when Proxy Mode is enabled. Disable Proxy to send multipart/form-data with files.');
       } 
       
       // Since server.js is simple, let's keep body strict string or JSON

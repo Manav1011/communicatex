@@ -2,6 +2,7 @@ import React from 'react';
 import { ApiRequest, BodyType, KeyValueItem } from '../../types';
 import AutocompleteInput from '../AutocompleteInput';
 import KeyValueEditor from '../KeyValueEditor';
+import MultipartEditor from '../MultipartEditor';
 
 interface RequestBodyProps {
   request: ApiRequest;
@@ -58,18 +59,17 @@ const RequestBody: React.FC<RequestBodyProps> = ({ request, onRequestChange, env
                 onChange={(val) => onRequestChange({ ...request, bodyContent: val })}
                 variables={environmentVariables}
                 className="w-full h-full bg-transparent p-4 text-sm font-mono text-zinc-200 outline-none resize-none leading-relaxed placeholder-zinc-600"
-                placeholder="{\n  \"key\": \"value\"\n}"
+                placeholder={`{ "id": <<id>> }`}
             />
             </div>
         )}
 
         {request.bodyType === 'form-data' && (
-             <KeyValueEditor 
-                title="Multipart Form Data" 
-                items={request.multipartParams || []} 
-                onChange={(items) => onRequestChange({...request, multipartParams: items})} 
-                variables={environmentVariables}
-            />
+          <MultipartEditor
+            title="Multipart Form Data"
+            items={request.multipartParams || []}
+            onChange={(items) => onRequestChange({ ...request, multipartParams: items })}
+          />
         )}
 
         {request.bodyType === 'x-www-form-urlencoded' && (
@@ -105,7 +105,7 @@ const RequestBody: React.FC<RequestBodyProps> = ({ request, onRequestChange, env
                             onChange={(val) => onRequestChange({ ...request, graphqlVariables: val })}
                             variables={environmentVariables}
                             className="w-full h-full bg-transparent p-3 text-sm font-mono text-zinc-200 outline-none resize-none"
-                            placeholder="{ \"id\": 1 }"
+                            placeholder={`{ "id": 1 }`}
                         />
                     </div>
                 </div>

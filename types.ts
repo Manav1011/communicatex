@@ -21,6 +21,16 @@ export interface KeyValueItem {
   enabled: boolean;
 }
 
+// Used specifically for multipart/form-data where each field can be text or file
+export type MultipartValueType = 'text' | 'file';
+
+export interface MultipartField extends KeyValueItem {
+  valueType: MultipartValueType;
+  // When valueType === 'file', value can be used for a display name, while
+  // the actual File object is stored separately
+  file?: File | null;
+}
+
 export interface RequestAuth {
   type: AuthMethod;
   token?: string;
@@ -44,7 +54,7 @@ export interface ApiRequest {
   // Body Config
   bodyType: BodyType;
   bodyContent: string; // Used for JSON
-  multipartParams: KeyValueItem[];
+  multipartParams: MultipartField[];
   formEncodedParams: KeyValueItem[];
   graphqlQuery: string;
   graphqlVariables: string;
@@ -74,6 +84,8 @@ export interface Workspace {
   id: string;
   name: string;
   createdAt: number;
+  // Optional backend workspace id when synced with the Node server
+  backendId?: number | null;
 }
 
 export interface Collection {
@@ -101,6 +113,21 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  // Backend user id from SQLite
+  backendId?: number | null;
+}
+
+export interface Invitation {
+  id: number;
+  workspaceId: number;
+  inviterId: number;
+  inviteeEmail: string;
+  role: string;
+  status: string;
+  createdAt: number;
+  workspaceName: string;
+  inviterName: string;
+  inviterEmail: string;
 }
 
 // Mock User for Auth simulation

@@ -61,17 +61,9 @@
         box-shadow: 0 0 20px -5px rgba(234, 88, 12, 0.3);
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
-  }
-}
-</script>
-</head>
+    <!-- Vite will load and transform this module; it mounts React into #root -->
+    <script type="module" src="/index.tsx"></script>
+  </head>
   <body>
     <div id="root"></div>
   </body>

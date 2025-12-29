@@ -2,7 +2,8 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const PORT = 3001;
+// Use a dedicated port for the proxy so it doesn't conflict with Vite
+const PORT = 4000;
 
 // Enable CORS for the frontend
 app.use(cors());
