@@ -38,7 +38,7 @@ const RequestAuth: React.FC<RequestAuthProps> = ({ request, onRequestChange, env
               value={request.auth.token || ''}
               onChange={(val) => onRequestChange({ ...request, auth: { ...request.auth, token: val } })}
               variables={environmentVariables}
-              placeholder="Enter your JWT or OAuth token here"
+              placeholder="Enter your JWT or var (e.g. {{token}})"
               className="w-full h-full bg-transparent p-3 text-sm text-foreground font-mono outline-none resize-none placeholder-zinc-600"
             />
           </div>

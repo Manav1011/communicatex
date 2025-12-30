@@ -17,6 +17,17 @@ const API_BASE = getApiBase();
 export const API_BASE_URL = API_BASE;
 
 export const apiService = {
+  // Workspaces
+  async createWorkspace(userId: number, name: string) {
+    const res = await fetch(`${API_BASE}/workspaces`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, name }),
+    });
+    const data = await res.json();
+    return data.workspace;
+  },
+
   // User preferences
   async getPreferences(userId: number) {
     const res = await fetch(`${API_BASE}/users/${userId}/preferences`);
@@ -97,7 +108,7 @@ export const apiService = {
     return data.requests || [];
   },
 
-  async saveRequest(request: { id?: string; workspaceId: number; collectionId?: string; name: string; [key: string]: any }) {
+  async saveRequest(request: { id?: string; workspaceId: number; collectionId?: string; name: string;[key: string]: any }) {
     const res = await fetch(`${API_BASE}/saved-requests`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

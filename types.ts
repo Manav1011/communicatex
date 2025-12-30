@@ -63,6 +63,7 @@ export interface ApiRequest {
 
   auth: RequestAuth;
   useProxy: boolean;
+  description?: string;
 }
 
 // Extends ApiRequest to include organization data

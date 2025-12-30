@@ -5,7 +5,8 @@ import { ApiRequest, ApiResponse, AuthMethod, HttpMethod, KeyValueItem } from '.
  */
 const interpolate = (text: string, variables: Record<string, string>): string => {
   if (!text) return text;
-  return text.replace(/<<([^>>]+)>>/g, (match, key) => {
+  // Match both <<key>> and {{key}}
+  return text.replace(/((?:<<|{{))([^>}|]+)((?:>>|}}))/g, (match, open, key, close) => {
     const trimmedKey = key.trim();
     return variables.hasOwnProperty(trimmedKey) ? variables[trimmedKey] : match;
   });

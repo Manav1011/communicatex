@@ -7,7 +7,10 @@ import RequestPanel from './components/RequestPanel';
 import ResponsePanel from './components/ResponsePanel';
 import KeyValueEditor from './components/KeyValueEditor';
 import CommandPalette from './components/CommandPalette';
-import { History, LogOut, Zap, LayoutGrid, Clock, ChevronDown, ChevronRight, Plus, Check, Box, Database, Trash2, Settings, Folder, Save, MoreVertical, FolderOpen, FileText, Mail, X, Copy, Edit, ExternalLink, Columns, Rows, Sun, Moon, SunDim, Search, Palette } from 'lucide-react';
+import { parseOpenApi } from './services/openApiParser';
+import { History, LogOut, Zap, LayoutGrid, Clock, ChevronDown, ChevronRight, Plus, Check, Box, Database, Trash2, Settings, Folder, Save, MoreVertical, FolderOpen, FileText, Mail, X, Copy, Edit, ExternalLink, Columns, Rows, Sun, Moon, SunDim, Search, Palette, Globe, Download } from 'lucide-react';
+import { saveResponseToDB, getResponseFromDB, deleteResponseFromDB } from './services/storage';
+import { generateOpenApi } from './services/openApiGenerator';
 
 const DEFAULT_REQUEST: ApiRequest = {
   id: 'default',
@@ -142,6 +145,14 @@ const App: React.FC = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
+  // OpenAPI Import State
+  const [showImportOpenApiModal, setShowImportOpenApiModal] = useState(false);
+  const [importOpenApiUrl, setImportOpenApiUrl] = useState('');
+  const [importOpenApiFile, setImportOpenApiFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'url' | 'file'>('url');
+  const [importOpenApiWorkspaceName, setImportOpenApiWorkspaceName] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
   // Global Key Commands
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -209,7 +220,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Theme & Brightness Effect
+  // Theme & Brightness & State Persistence Effect
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as Theme;
     if (savedTheme) {
@@ -223,7 +234,61 @@ const App: React.FC = () => {
       setBrightness(b);
       document.body.style.filter = `brightness(${b}%)`;
     }
+
+    // Load persisted tabs (Client Side Storage)
+    const loadState = async () => {
+      try {
+        const savedTabsJson = localStorage.getItem('communicatex_tabs');
+        if (savedTabsJson) {
+          const simpleTabs = JSON.parse(savedTabsJson);
+          if (Array.isArray(simpleTabs) && simpleTabs.length > 0) {
+            // Rehydrate with responses from IndexedDB
+            const hydratedTabs = await Promise.all(simpleTabs.map(async (tab: any) => {
+              const res = await getResponseFromDB(tab.id);
+              return { ...tab, response: res };
+            }));
+            setRequestTabs(hydratedTabs);
+
+            const savedActiveId = localStorage.getItem('communicatex_active_tab');
+            if (savedActiveId && hydratedTabs.find(t => t.id === savedActiveId)) {
+              setActiveTabId(savedActiveId);
+            } else {
+              setActiveTabId(hydratedTabs[0].id);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load persisted state:', e);
+      }
+    };
+    loadState();
   }, []);
+
+  // Persist Tabs & Responses
+  useEffect(() => {
+    if (requestTabs.length === 0) return;
+
+    // Debounce save slightly to avoid thrashing during typing
+    const handler = setTimeout(() => {
+      // 1. Save Tab Structure to LocalStorage (without Heavy Response)
+      const tabsToSave = requestTabs.map(t => ({
+        id: t.id,
+        request: t.request,
+        response: null // Don't save response in LS
+      }));
+      localStorage.setItem('communicatex_tabs', JSON.stringify(tabsToSave));
+      localStorage.setItem('communicatex_active_tab', activeTabId);
+
+      // 2. Save Responses to IndexedDB (Only if present)
+      requestTabs.forEach(t => {
+        if (t.response) {
+          saveResponseToDB(t.id, t.response);
+        }
+      });
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [requestTabs, activeTabId]);
 
   const applyThemeToElement = (t: Theme) => {
     const root = document.documentElement;
@@ -642,6 +707,128 @@ const App: React.FC = () => {
     }
   };
 
+  // Export OpenAPI
+  const handleExportOpenApi = () => {
+    try {
+      const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || DEFAULT_WORKSPACE;
+      const openApiJson = generateOpenApi(activeWorkspace, collections, savedRequests);
+
+      const blob = new Blob([openApiJson], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${activeWorkspace.name.replace(/\s+/g, '_').toLowerCase()}_openapi.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      addToast('OpenAPI schema exported successfully', 'success');
+      setShowWorkspaceMenu(false);
+    } catch (err) {
+      console.error('Export Error:', err);
+      addToast('Failed to export OpenAPI schema', 'error');
+    }
+  };
+
+  const handleImportOpenApi = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importOpenApiWorkspaceName.trim() || !user?.backendId) return;
+
+    // Validation
+    if (importMode === 'url' && !importOpenApiUrl.trim()) {
+      addToast('Please enter a valid URL', 'error');
+      return;
+    }
+    if (importMode === 'file' && !importOpenApiFile) {
+      addToast('Please select a file to import', 'error');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      // 1. Parse Schema
+      let result;
+      if (importMode === 'url') {
+        const { parseOpenApi } = await import('./services/openApiParser');
+        result = await parseOpenApi(importOpenApiUrl.trim());
+      } else {
+        // File Mode
+        const fileContent = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = (e) => reject(e);
+          reader.readAsText(importOpenApiFile!);
+        });
+
+        const { parseOpenApiContent } = await import('./services/openApiParser');
+        let schema;
+        try {
+          schema = JSON.parse(fileContent);
+        } catch (e) {
+          throw new Error('Invalid JSON file');
+        }
+        result = parseOpenApiContent(schema);
+      }
+      addToast(`Schema parsed: ${result.title}`, 'info');
+
+      // 2. Create Workspace
+      const workspace = await apiService.createWorkspace(user.backendId, importOpenApiWorkspaceName.trim());
+      const newWs: Workspace = {
+        id: `ws_${workspace.id}`,
+        name: workspace.name,
+        createdAt: workspace.createdAt,
+        backendId: workspace.id,
+      };
+      setWorkspaces(prev => [...prev, newWs]);
+      setActiveWorkspaceId(newWs.id);
+
+      // 3. Create Collections and Requests
+      for (const group of result.groups) {
+        const collection = await apiService.createCollection(workspace.id, group.tag);
+        for (const req of group.requests) {
+          await apiService.saveRequest({
+            ...DEFAULT_REQUEST,
+            ...req,
+            name: req.name || 'Untitled',
+            workspaceId: workspace.id,
+            collectionId: String(collection.id),
+          });
+        }
+      }
+
+      // 4. Refresh Data
+      const [cols, reqs] = await Promise.all([
+        apiService.getCollections(workspace.id),
+        apiService.getSavedRequests(workspace.id),
+      ]);
+
+      setCollections(cols.map((c: any) => ({
+        id: `col_${c.id}`,
+        workspaceId: newWs.id,
+        name: c.name,
+        createdAt: c.createdAt,
+      })));
+
+      setSavedRequests(reqs.map((r: any) => ({
+        ...r,
+        id: String(r.id),
+        workspaceId: newWs.id,
+        collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
+      })));
+
+      addToast(`Imported ${result.groups.length} collections from ${result.title}`, 'success');
+      setShowImportOpenApiModal(false);
+      setImportOpenApiUrl('');
+      setImportOpenApiWorkspaceName('');
+    } catch (err) {
+      console.error('Import OpenAPI Error:', err);
+      addToast(err instanceof Error ? err.message : 'Failed to import OpenAPI schema', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCollectionName.trim()) return;
@@ -771,6 +958,9 @@ const App: React.FC = () => {
   };
 
   const closeTab = (tabId: string) => {
+    // Clean up IndexedDB for this tab
+    deleteResponseFromDB(tabId);
+
     if (requestTabs.length === 1) {
       // Don't close the last tab, just reset it
       const resetRequest = { ...DEFAULT_REQUEST, id: 'default', name: 'New Request' };
@@ -792,6 +982,12 @@ const App: React.FC = () => {
   const closeOtherTabs = (keepTabId: string) => {
     const keepTab = requestTabs.find(tab => tab.id === keepTabId);
     if (keepTab) {
+      // Cleanup IndexedDB for all other tabs
+      requestTabs.forEach(tab => {
+        if (tab.id !== keepTabId) {
+          deleteResponseFromDB(tab.id);
+        }
+      });
       setRequestTabs([keepTab]);
       setActiveTabId(keepTabId);
     }
@@ -1251,30 +1447,30 @@ const App: React.FC = () => {
       {/* Sidebar */}
       <div className="w-72 bg-surface border-r border-border flex flex-col relative z-10">
         {/* Workspace Switcher Header */}
-        <div className="p-4 border-b border-border relative">
+        <div className="p-3 border-b border-border relative">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-              className="flex-1 flex items-center justify-between p-2 rounded-lg hover:bg-surfaceLight transition-colors group"
+              className="flex-1 flex items-center justify-between p-1.5 rounded-lg hover:bg-surfaceLight/50 transition-colors group"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-surfaceHighlight flex items-center justify-center text-primary shadow-sm">
-                  <Box size={18} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-md bg-surfaceHighlight/50 flex items-center justify-center text-primary/80 shadow-sm border border-border/10">
+                  <Box size={14} />
                 </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-xs text-textSecondary font-medium">Workspace</span>
-                  <span className="text-sm font-bold text-foreground truncate max-w-[140px]">{activeWorkspace.name}</span>
+                <div className="flex flex-col items-start leading-tight">
+                  <span className="text-[10px] text-textSecondary font-bold uppercase tracking-wider opacity-60">Workspace</span>
+                  <span className="text-[13px] font-bold text-foreground truncate max-w-[130px]">{activeWorkspace.name}</span>
                 </div>
               </div>
-              <ChevronDown size={16} className={`text-textSecondary transition-transform ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`text-textSecondary/50 transition-transform ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
             </button>
             {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
               <button
                 onClick={() => setShowInviteModal(true)}
-                className="p-2 rounded-lg text-textSecondary hover:text-primary hover:bg-surfaceLight transition-colors"
-                title="Invite a collaborator to this workspace"
+                className="p-1.5 rounded-md text-textSecondary/60 hover:text-primary hover:bg-surfaceLight/50 transition-colors"
+                title="Invite a collaborator"
               >
-                <Mail size={16} />
+                <Mail size={14} />
               </button>
             )}
           </div>
@@ -1459,6 +1655,23 @@ const App: React.FC = () => {
                     <Plus size={14} />
                     <span>New Workspace</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setShowImportOpenApiModal(true);
+                      setShowWorkspaceMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-emerald-400 hover:bg-emerald-400/10 transition-colors mt-1"
+                  >
+                    <Globe size={14} />
+                    <span>Import OpenAPI</span>
+                  </button>
+                  <button
+                    onClick={handleExportOpenApi}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-400 hover:bg-blue-400/10 transition-colors mt-1"
+                  >
+                    <Download size={14} />
+                    <span>Export OpenAPI</span>
+                  </button>
                 </div>
               </div>
             </>
@@ -1472,11 +1685,11 @@ const App: React.FC = () => {
               onClick={() => setIsEnvExpanded(!isEnvExpanded)}
               className="flex-1 flex items-center gap-2 text-left"
             >
-              <ChevronRight size={14} className={`text-textSecondary transition-transform ${isEnvExpanded ? 'rotate-90' : ''}`} />
-              <Database size={14} className={activeEnvId ? "text-primary" : "text-textSecondary"} />
-              <span className="text-xs font-semibold uppercase tracking-wider text-textSecondary">Environment</span>
+              <ChevronRight size={12} className={`text-textSecondary/50 transition-transform ${isEnvExpanded ? 'rotate-90' : ''}`} />
+              <Database size={12} className={activeEnvId ? "text-primary/80" : "text-textSecondary/60"} />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-textSecondary/80">Environment</span>
               {activeEnvId && (
-                <span className="text-xs text-primary font-medium truncate max-w-[100px]">
+                <span className="text-[10px] text-primary/80 font-medium truncate max-w-[80px]">
                   ({environments.find(e => e.id === activeEnvId)?.name || 'Active'})
                 </span>
               )}
@@ -1499,16 +1712,16 @@ const App: React.FC = () => {
             <div className="px-3 pb-2 space-y-1">
               <button
                 onClick={() => { setActiveEnvId(null); addToast('Switched to no environment', 'info'); }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all ${!activeEnvId
-                  ? 'bg-surfaceLight/80 text-foreground shadow-sm'
-                  : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/30'
+                className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all ${!activeEnvId
+                  ? 'bg-surfaceHighlight text-foreground shadow-sm'
+                  : 'text-textSecondary/70 hover:text-foreground hover:bg-surfaceLight/20'
                   }`}
               >
-                <span className="flex items-center gap-2.5">
-                  <Database size={13} className={!activeEnvId ? "text-primary" : "text-textSecondary"} />
+                <span className="flex items-center gap-2">
+                  <Database size={11} className={!activeEnvId ? "text-primary/70" : "text-textSecondary/40"} />
                   <span className="font-medium">No Environment</span>
                 </span>
-                {!activeEnvId && <Check size={13} className="text-primary" />}
+                {!activeEnvId && <Check size={11} className="text-primary" />}
               </button>
               {environments.map(env => (
                 <div
@@ -1559,42 +1772,43 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* Sidebar Search Bar */}
-        <div className="px-4 py-2 bg-surface">
+        {/* Sidebar View Switcher & Search */}
+        <div className="flex flex-col gap-2 px-3 py-2">
+          {/* View Switcher */}
+          <div className="flex gap-1 bg-surfaceHighlight/30 p-1 rounded-lg">
+            <button
+              onClick={() => setSidebarView('collections')}
+              className={`flex-1 flex items-center justify-center py-1.5 rounded-md transition-all text-[11px] font-medium ${sidebarView === 'collections'
+                ? 'bg-surface shadow-sm text-primary'
+                : 'text-textSecondary hover:text-foreground hover:bg-white/5'
+                }`}
+            >
+              <Folder size={12} className="mr-1.5" />
+              Collections
+            </button>
+            <button
+              onClick={() => setSidebarView('history')}
+              className={`flex-1 flex items-center justify-center py-1.5 rounded-md transition-all text-[11px] font-medium ${sidebarView === 'history'
+                ? 'bg-surface shadow-sm text-primary'
+                : 'text-textSecondary hover:text-foreground hover:bg-white/5'
+                }`}
+            >
+              <Clock size={12} className="mr-1.5" />
+              History
+            </button>
+          </div>
+
+          {/* Search Bar */}
           <div className="relative group/search">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary group-focus-within/search:text-primary transition-colors" />
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-textSecondary/50 group-focus-within/search:text-primary transition-colors" />
             <input
               type="text"
-              placeholder={`Search ${sidebarView === 'history' ? 'history' : 'collections'}...`}
+              placeholder="Filter..."
               value={sidebarSearchQuery}
               onChange={(e) => setSidebarSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-surfaceHighlight/50 hover:bg-surfaceHighlight rounded-xl text-xs text-foreground placeholder-textSecondary/60 outline-none focus:ring-1 focus:ring-primary/40 transition-all shadow-inner"
+              className="w-full pl-8 pr-3 py-1.5 bg-surfaceHighlight/20 hover:bg-surfaceHighlight/40 border border-transparent focus:border-primary/20 rounded-md text-[11px] text-foreground placeholder-textSecondary/40 outline-none transition-all"
             />
           </div>
-        </div>
-
-        {/* Sidebar View Switcher */}
-        <div className="flex p-4 gap-1 bg-surface">
-          <button
-            onClick={() => setSidebarView('collections')}
-            className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${sidebarView === 'collections'
-              ? 'bg-surfaceHighlight text-primary'
-              : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/30'
-              }`}
-            title="Collections"
-          >
-            <Folder size={16} />
-          </button>
-          <button
-            onClick={() => setSidebarView('history')}
-            className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${sidebarView === 'history'
-              ? 'bg-surfaceHighlight text-primary'
-              : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/30'
-              }`}
-            title="History"
-          >
-            <Clock size={16} />
-          </button>
         </div>
 
         {/* Sidebar Content */}
@@ -1641,10 +1855,10 @@ const App: React.FC = () => {
               {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
                 <button
                   onClick={() => setShowCreateCollectionModal(true)}
-                  className="w-full flex items-center justify-center p-2 mb-2 bg-surfaceLight/30 hover:bg-primary/10 text-primary/70 hover:text-primary rounded-lg transition-all"
-                  title="New Collection"
+                  className="w-full flex items-center justify-center py-1.5 mb-1 bg-surfaceLight/20 hover:bg-primary/5 text-primary/60 hover:text-primary rounded-md border border-dashed border-border/40 hover:border-primary/30 transition-all font-medium text-[10px] uppercase tracking-wider"
                 >
-                  <Plus size={16} />
+                  <Plus size={12} className="mr-1.5" />
+                  New Collection
                 </button>
               )}
 
@@ -1659,7 +1873,7 @@ const App: React.FC = () => {
                 return (
                   <div key={col.id} className="group/col">
                     <div
-                      className="flex items-center justify-between mb-1 p-1.5 rounded-lg hover:bg-surfaceLight/30 group/header transition-colors"
+                      className="flex items-center justify-between p-1 rounded-md hover:bg-surfaceLight/20 group/header transition-colors"
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setCollectionContextMenu({ x: e.clientX, y: e.clientY, collectionId: col.id });
@@ -1667,45 +1881,45 @@ const App: React.FC = () => {
                     >
                       <button
                         onClick={() => toggleCollection(col.id)}
-                        className="flex items-center gap-2.5 flex-1 overflow-hidden"
+                        className="flex items-center gap-2 flex-1 overflow-hidden"
                       >
-                        <ChevronRight size={14} className={`text-textSecondary transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                        {isExpanded ? <FolderOpen size={16} className="text-primary" /> : <Folder size={16} className="text-primary/70" />}
-                        <span className="text-sm font-medium text-foreground truncate">{col.name}</span>
+                        <ChevronRight size={12} className={`text-textSecondary/50 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        {isExpanded ? <FolderOpen size={14} className="text-primary/80" /> : <Folder size={14} className="text-primary/60" />}
+                        <span className="text-[13px] font-medium text-foreground/90 truncate">{col.name}</span>
                       </button>
                       <button
                         onClick={() => deleteCollection(col.id)}
-                        className="opacity-0 group-hover/header:opacity-100 text-textSecondary hover:text-danger transition-opacity p-1.5 rounded hover:bg-surfaceLight/50"
+                        className="opacity-0 group-hover/header:opacity-100 text-textSecondary/40 hover:text-danger transition-opacity p-1 rounded hover:bg-danger/10"
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={12} />
                       </button>
                     </div>
 
                     {isExpanded && (
-                      <div className="pl-5 border-l border-border ml-3 space-y-1">
+                      <div className="pl-3 border-l border-border/30 ml-2.5 my-0.5 space-y-0.5">
                         {colRequests.length === 0 && (
-                          <div className="text-[10px] text-textSecondary pl-4 py-2 italic">Empty collection</div>
+                          <div className="text-[10px] text-textSecondary/50 pl-4 py-1.5 italic">Empty collection</div>
                         )}
                         {colRequests.filter(req => req && req.id).map(req => (
                           <div key={req.id} className="flex items-center group/req">
                             <button
                               onClick={() => restoreRequest(req)}
-                              className={`flex-1 flex items-center gap-2 p-1.5 rounded-lg hover:bg-surfaceLight/50 text-left overflow-hidden transition-all ${request.id === req.id ? 'bg-surfaceLight/50 ring-1 ring-border/50' : ''}`}
+                              className={`flex-1 flex items-center gap-1.5 p-1 rounded-md hover:bg-surfaceLight/20 text-left overflow-hidden transition-all ${request.id === req.id ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
                             >
-                              <span className={`text-[9px] font-bold w-9 text-center rounded px-1 py-0.5 ${req.method === 'GET' ? 'text-blue-400 bg-blue-400/10' :
-                                req.method === 'POST' ? 'text-emerald-400 bg-emerald-400/10' :
-                                  req.method === 'DELETE' ? 'text-red-400 bg-red-400/10' :
-                                    'text-indigo-400 bg-indigo-400/10'
+                              <span className={`text-[8px] font-bold w-7 text-center rounded py-0.5 ${req.method === 'GET' ? 'text-blue-400/80 bg-blue-400/5 border border-blue-400/10' :
+                                req.method === 'POST' ? 'text-emerald-400/80 bg-emerald-400/5 border border-emerald-400/10' :
+                                  req.method === 'DELETE' ? 'text-red-400/80 bg-red-400/5 border border-red-400/10' :
+                                    'text-indigo-400/80 bg-indigo-400/5 border border-indigo-400/10'
                                 }`}>
                                 {req.method}
                               </span>
-                              <span className="text-xs text-foreground truncate font-medium">{req.name}</span>
+                              <span className="text-[12px] text-textSecondary group-hover/req:text-foreground truncate font-medium">{req.name}</span>
                             </button>
                             <button
                               onClick={() => deleteSavedRequest(req.id)}
-                              className="opacity-0 group-hover/req:opacity-100 p-1.5 text-textSecondary hover:text-danger rounded transition-opacity hover:bg-surfaceLight/30"
+                              className="opacity-0 group-hover/req:opacity-100 p-1 text-textSecondary/40 hover:text-danger rounded transition-opacity hover:bg-danger/10"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={11} />
                             </button>
                           </div>
                         ))}
@@ -1720,39 +1934,37 @@ const App: React.FC = () => {
         </div>
 
         {/* User Footer */}
-        <div className="p-3 mx-4 mb-4 mt-auto bg-surfaceLight/20 rounded-xl hover:bg-surfaceLight/40 transition-colors group">
+        <div className="p-2 mx-3 mb-3 mt-auto bg-surfaceLight/10 rounded-lg hover:bg-surfaceLight/20 transition-all group">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-blue-900/20">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-7 h-7 rounded bg-primary/90 flex items-center justify-center text-[10px] font-bold text-white shadow-sm shrink-0">
                 {user.name.charAt(0)}
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-foreground">{user.name}</span>
-                <span className="text-[10px] text-textSecondary">Pro Plan</span>
+              <div className="flex flex-col min-w-0 leading-tight">
+                <span className="text-[11px] font-bold text-foreground/90 truncate">{user.name}</span>
+                <span className="text-[9px] text-textSecondary/50 font-medium">Pro Plan</span>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 onClick={() => {
                   if (user) fetchInvitations(user.email);
                   setShowInboxModal(true);
                 }}
-                className="text-textSecondary hover:text-primary transition-colors p-2 hover:bg-white/5 rounded-md relative"
+                className="text-textSecondary/40 hover:text-primary transition-colors p-1.5 hover:bg-primary/5 rounded relative"
                 title="View invitations"
               >
-                <Mail size={16} />
+                <Mail size={13} />
                 {invitations.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-danger rounded-full text-[8px] flex items-center justify-center text-white font-bold">
-                    {invitations.length}
-                  </span>
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-danger rounded-full ring-1 ring-surface" />
                 )}
               </button>
               <button
                 onClick={handleLogout}
-                className="text-textSecondary hover:text-foreground transition-colors p-2 hover:bg-white/5 rounded-md"
+                className="text-textSecondary/40 hover:text-danger p-1.5 transition-colors hover:bg-danger/5 rounded"
                 title="Logout"
               >
-                <LogOut size={16} />
+                <LogOut size={13} />
               </button>
             </div>
           </div>
@@ -2155,6 +2367,100 @@ const App: React.FC = () => {
                   className="px-4 py-2 rounded-lg text-sm font-bold bg-primary text-white hover:bg-primaryHover transition-colors shadow-lg shadow-blue-900/20"
                 >
                   Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import OpenAPI Modal */}
+      {showImportOpenApiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-2xl p-6 animate-in fade-in zoom-in-95">
+            <h2 className="text-xl font-bold text-foreground mb-1">Import OpenAPI Schema</h2>
+            <p className="text-sm text-textSecondary mb-6">Import endpoints from an OpenAPI 3.x URL.</p>
+
+            <form onSubmit={handleImportOpenApi}>
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Import Source</label>
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setImportMode('url')}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${importMode === 'url' ? 'bg-primary text-white' : 'bg-surfaceLight text-textSecondary hover:text-foreground'}`}
+                    >
+                      URL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportMode('file')}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${importMode === 'file' ? 'bg-primary text-white' : 'bg-surfaceLight text-textSecondary hover:text-foreground'}`}
+                    >
+                      File Upload
+                    </button>
+                  </div>
+                </div>
+
+                {importMode === 'url' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Schema URL</label>
+                    <input
+                      type="url"
+                      autoFocus
+                      required={importMode === 'url'}
+                      value={importOpenApiUrl}
+                      onChange={(e) => setImportOpenApiUrl(e.target.value)}
+                      className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="https://api.example.com/openapi.json"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Select File</label>
+                    <input
+                      type="file"
+                      accept=".json"
+                      required={importMode === 'file'}
+                      onChange={(e) => setImportOpenApiFile(e.target.files ? e.target.files[0] : null)}
+                      className="w-full bg-surfaceLight border border-border p-2 rounded-lg text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30"
+                    />
+                    <p className="mt-1 text-[10px] text-textSecondary">Supported format: JSON (OpenAPI 3.0+)</p>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Target Workspace Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={importOpenApiWorkspaceName}
+                    onChange={(e) => setImportOpenApiWorkspaceName(e.target.value)}
+                    className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="e.g. My Imported API"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowImportOpenApiModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-textSecondary hover:text-foreground hover:bg-surfaceLight transition-colors"
+                  disabled={isImporting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isImporting}
+                  className="px-4 py-2 rounded-lg text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors shadow-lg shadow-emerald-900/20 flex items-center gap-2"
+                >
+                  {isImporting ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Importing...
+                    </>
+                  ) : 'Import Schema'}
                 </button>
               </div>
             </form>

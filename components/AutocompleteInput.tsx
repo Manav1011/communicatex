@@ -43,13 +43,13 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     const idx = e.target.selectionStart || 0;
     setCursorIndex(idx);
 
-    // Look backwards from cursor for '<<' pattern
+    // Look backwards from cursor for '<<' or '{{' pattern
     const textBeforeCursor = val.slice(0, idx);
-    const match = textBeforeCursor.match(/<<([a-zA-Z0-9_]*)$/);
+    const match = textBeforeCursor.match(/((?:<<|{{))([a-zA-Z0-9_]*)$/);
 
     if (match) {
       setShowSuggestions(true);
-      setFilter(match[1]);
+      setFilter(match[2]);
     } else {
       setShowSuggestions(false);
     }
@@ -59,13 +59,16 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     const textBeforeCursor = value.slice(0, cursorIndex);
     const textAfterCursor = value.slice(cursorIndex);
 
-    // Find the last occurrence of '<<' before cursor
-    const lastOpenIndex = textBeforeCursor.lastIndexOf('<<');
-    if (lastOpenIndex === -1) return;
+    // Find the last occurrence of trigger before cursor
+    const match = textBeforeCursor.match(/((?:<<|{{))([a-zA-Z0-9_]*)$/);
+    if (!match || typeof match.index === 'undefined') return;
+
+    const prefix = match[1];
+    const suffix = prefix === '<<' ? '>>' : '}}';
 
     const newValue =
-      value.slice(0, lastOpenIndex) +
-      `<<${variableKey}>>` +
+      textBeforeCursor.slice(0, match.index) +
+      `${prefix}${variableKey}${suffix}` +
       textAfterCursor;
 
     onChange(newValue);
