@@ -95,6 +95,7 @@ export interface ApiRequest {
   description?: string;
   expectedResponses?: ExpectedResponse[];
   testCases?: TestCase[];
+  postRequestScript?: string;
 }
 
 // Extends ApiRequest to include organization data
@@ -113,6 +114,7 @@ export interface ApiResponse {
   data: any;
   error?: string;
   testResults?: TestResult[];
+  scriptLogs?: string[];
 }
 
 export interface Workspace {

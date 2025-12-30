@@ -9,7 +9,7 @@ interface ResponsePanelProps {
 }
 
 const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToast }) => {
-  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'diff' | 'tests'>('body');
+  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'diff' | 'tests' | 'console'>('body');
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [isExpanded, setIsExpanded] = useState(false);
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
@@ -205,27 +205,23 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
   return (
     <div className="h-full flex flex-col bg-surface">
       {/* Response Meta Bar */}
-      <div className="flex flex-col border-b border-border bg-surface/50 backdrop-blur-sm">
-        <div className="flex items-center gap-6 p-4 pb-2">
-          <div className={`px-3 py-1 rounded-md border border-border text-sm font-mono font-bold flex items-center gap-2 ${statusStyle}`}>
-            {isError ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
+      <div className="flex flex-col border-b border-border bg-surfaceLight/30">
+        <div className="flex items-center gap-6 px-4 py-2.5">
+          <div className={`px-2 py-0.5 rounded text-xs font-mono font-bold flex items-center gap-1.5 border ${statusStyle}`}>
+            {isError ? <AlertCircle size={12} /> : <CheckCircle size={12} />}
             {response.statusCode === 0 ? 'ERROR' : `${response.statusCode} ${response.statusText}`}
           </div>
 
-          <div className="h-4 w-px bg-border"></div>
-
           <div className="flex items-center gap-2">
-            <Clock size={14} className="text-textSecondary" />
-            <span className="text-xs text-textSecondary uppercase font-bold tracking-wider">Time</span>
-            <span className="text-sm font-mono text-foreground">
+            <span className="text-[10px] text-textSecondary uppercase font-bold tracking-widest opacity-50">Time</span>
+            <span className="text-xs font-mono text-success">
               {response.time}ms
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <Database size={14} className="text-textSecondary" />
-            <span className="text-xs text-textSecondary uppercase font-bold tracking-wider">Size</span>
-            <span className="text-sm font-mono text-foreground">
+            <span className="text-[10px] text-textSecondary uppercase font-bold tracking-widest opacity-50">Size</span>
+            <span className="text-xs font-mono text-foreground/80">
               {(response.size / 1024).toFixed(2)} KB
             </span>
           </div>
@@ -236,21 +232,21 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
                 setPinnedResponse(response);
                 addToast('Response pinned for comparison', 'success');
               }}
-              className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-bold transition-all ${pinnedResponse ? 'bg-primary/20 text-primary border border-primary/30' : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/50 border border-transparent'}`}
-              title="Pin this response to compare with others"
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-bold transition-all border ${pinnedResponse ? 'bg-primary/20 text-primary border-primary/30' : 'text-textSecondary hover:text-foreground border-transparent hover:border-border'}`}
+              title="Pin this response"
             >
-              <Bookmark size={14} fill={pinnedResponse ? "currentColor" : "none"} />
+              <Bookmark size={12} fill={pinnedResponse ? "currentColor" : "none"} />
               {pinnedResponse ? 'Pinned' : 'Pin'}
             </button>
           </div>
         </div>
 
         {/* Tabs and Actions */}
-        <div className="flex items-center justify-between px-2 border-b border-border">
+        <div className="flex items-center justify-between px-2 border-t border-border/50">
           <div className="flex">
             <button
               onClick={() => { setActiveTab('body'); setViewMode('pretty'); }}
-              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'body' && viewMode === 'pretty'
+              className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'body' && viewMode === 'pretty'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-textSecondary hover:text-foreground'
                 }`}
@@ -259,7 +255,7 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
             </button>
             <button
               onClick={() => { setActiveTab('body'); setViewMode('raw'); }}
-              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'body' && viewMode === 'raw'
+              className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'body' && viewMode === 'raw'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-textSecondary hover:text-foreground'
                 }`}
@@ -268,39 +264,53 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
             </button>
             <button
               onClick={() => setActiveTab('headers')}
-              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'headers'
+              className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'headers'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-textSecondary hover:text-foreground'
                 }`}
             >
-              Headers {Object.keys(response.headers).length > 0 && <span className="text-[10px] ml-1 bg-surfaceHighlight px-1 rounded opacity-60">{Object.keys(response.headers).length}</span>}
+              Headers {Object.keys(response.headers).length > 0 && <span className="opacity-40 ml-1">{Object.keys(response.headers).length}</span>}
             </button>
             {pinnedResponse && response && (
               <button
                 onClick={() => setActiveTab('diff')}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'diff'
+                className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'diff'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-textSecondary hover:text-foreground'
                   }`}
               >
-                <GitCompare size={14} />
+                <GitCompare size={12} />
                 Diff
               </button>
             )}
             {response.testResults && (
               <button
                 onClick={() => setActiveTab('tests')}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'tests'
+                className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'tests'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-textSecondary hover:text-foreground'
                   }`}
               >
                 Tests
-                <span className={`text-[10px] ml-1 px-1.5 rounded-full font-bold ${response.testResults.every(r => r.passed)
+                <span className={`text-[9px] ml-1.5 px-1.5 rounded-full font-bold ${response.testResults.every(r => r.passed)
                   ? 'bg-success/20 text-success'
                   : 'bg-danger/20 text-danger'
                   }`}>
                   {response.testResults.filter(r => r.passed).length}/{response.testResults.length}
+                </span>
+              </button>
+            )}
+            {response.scriptLogs && (
+              <button
+                onClick={() => setActiveTab('console')}
+                className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'console'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-textSecondary hover:text-foreground'
+                  }`}
+              >
+                Console
+                <span className="text-[9px] ml-1.5 px-1.5 rounded-full font-bold bg-surfaceHighlight text-textSecondary">
+                  {response.scriptLogs.length}
                 </span>
               </button>
             )}
@@ -489,8 +499,8 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
                 <div
                   key={idx}
                   className={`p-4 rounded-xl border transition-all ${result.passed
-                      ? 'bg-success/5 border-success/10 shadow-sm'
-                      : 'bg-danger/5 border-danger/10 shadow-sm'
+                    ? 'bg-success/5 border-success/10 shadow-sm'
+                    : 'bg-danger/5 border-danger/10 shadow-sm'
                     }`}
                 >
                   <div className="flex items-start gap-3">
@@ -529,6 +539,35 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
                   <p className="text-xs text-textSecondary mt-1">Define assertions in the "Tests" tab of your request to see results here.</p>
                 </div>
               )}
+            </div>
+          )}
+          {activeTab === 'console' && response.scriptLogs && (
+            <div className="p-4 font-mono text-xs">
+              <div className="bg-background border border-border rounded-xl overflow-hidden shadow-inner">
+                <div className="flex items-center gap-2 px-4 py-2 bg-surfaceLight/50 border-b border-border">
+                  <Terminal size={14} className="text-textSecondary" />
+                  <span className="text-[10px] font-bold text-textSecondary uppercase tracking-widest">Script Terminal</span>
+                </div>
+                <div className="p-4 space-y-2 min-h-[200px] max-h-[500px] overflow-y-auto scrollbar-hide">
+                  {response.scriptLogs.map((log, idx) => {
+                    const isError = log.startsWith('ERROR:') || log.startsWith('RUNTIME ERROR:');
+                    return (
+                      <div key={idx} className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                        <span className="text-textSecondary/30 shrink-0 select-none">[{idx + 1}]</span>
+                        <pre className={`whitespace-pre-wrap break-all ${isError ? 'text-danger' : 'text-foreground/90'}`}>
+                          {log}
+                        </pre>
+                      </div>
+                    );
+                  })}
+                  {response.scriptLogs.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-12 text-center opacity-40">
+                      <Terminal size={32} className="mb-3" />
+                      <p>No logs to display</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

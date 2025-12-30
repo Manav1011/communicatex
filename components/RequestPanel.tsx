@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { ApiRequest, HttpMethod, KeyValueItem, AuthMethod } from '../types';
-import { Play, Save, Layers, Shield, FileJson, Link, Globe, Code, X, ArrowDownToLine, Info, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Play, Save, Layers, Shield, FileJson, Link, Globe, Code, X, ArrowDownToLine, Info, Plus, Trash2, CheckCircle2, Terminal } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
 import AutocompleteInput from './AutocompleteInput';
 import CustomSelect from './CustomSelect';
 import RequestAuth from './request/RequestAuth';
 import RequestBody from './request/RequestBody';
 import RequestTests from './request/RequestTests';
+import RequestScripts from './request/RequestScripts';
 import { generateCurl, generateJavascript, generatePython } from '../services/codeGenerator';
 
 interface RequestPanelProps {
@@ -21,7 +22,7 @@ interface RequestPanelProps {
 }
 
 const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, onSend, onSave, loading, environmentVariables = [], isSavedRequest = false, addToast }) => {
-  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests'>('params');
+  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests' | 'scripts'>('params');
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [codeLang, setCodeLang] = useState<'curl' | 'js' | 'python'>('curl');
@@ -79,17 +80,17 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
 
   return (
     <div className="flex flex-col h-full bg-surface">
-      {/* Top Bar: Method & URL */}
-      <div className="p-4 border-b border-border bg-surface/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="flex gap-2 h-11">
-          <div className="flex-1 flex bg-surfaceLight rounded-lg focus-within:ring-1 focus-within:ring-primary/50 transition-all z-20 shadow-inner">
+      {/* Unified Control Center: Method & URL */}
+      <div className="px-4 py-3 border-b border-border bg-surfaceLight/30 sticky top-0 z-40">
+        <div className="flex gap-2 items-center">
+          <div className="flex-1 flex bg-background border border-border rounded-lg focus-within:border-primary/50 transition-all overflow-hidden h-10">
             {/* Method Selector */}
-            <div className="bg-surfaceLight h-full min-w-[110px] rounded-l-lg">
+            <div className="h-full min-w-[90px] border-r border-border bg-surfaceLight/20">
               <CustomSelect
                 value={request.method}
                 onChange={handleMethodChange}
                 options={methodOptions}
-                className={`w-full h-full px-4 font-bold text-sm ${getMethodColor(request.method)}`}
+                className={`w-full h-full px-3 font-bold text-[11px] tracking-wider ${getMethodColor(request.method)}`}
                 dropdownClassName="w-32"
               />
             </div>
@@ -100,12 +101,12 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
                 onChange={handleUrlChange}
                 variables={environmentVariables}
                 placeholder="https://api.example.com/v1/endpoint"
-                className="w-full h-full bg-transparent px-4 text-foreground text-sm focus:outline-none font-mono placeholder-zinc-600"
+                className="w-full h-full bg-transparent px-4 text-foreground text-sm focus:outline-none font-mono placeholder-zinc-700"
               />
             </div>
 
-            {/* Proxy Toggle */}
-            <div className="h-full flex items-center justify-center gap-1 px-1">
+            {/* In-bar Actions */}
+            <div className="h-full flex items-center px-1 gap-0.5 border-l border-border bg-surfaceLight/10">
               <button
                 onClick={() => {
                   const curl = prompt('Paste cURL command:');
@@ -114,83 +115,88 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
                 className="p-1.5 text-textSecondary hover:text-primary transition-all rounded-md"
                 title="Import cURL"
               >
-                <ArrowDownToLine size={16} />
+                <ArrowDownToLine size={14} />
               </button>
               <button
                 onClick={toggleProxy}
                 className={`p-1.5 rounded-md transition-all ${request.useProxy
-                  ? 'text-primary bg-primary/10 shadow-[0_0_10px_-3px_rgba(234,88,12,0.5)]'
+                  ? 'text-primary bg-primary/10'
                   : 'text-textSecondary hover:text-foreground'
                   }`}
-                title={request.useProxy ? "Proxy Enabled: Bypassing CORS" : "Proxy Disabled: Direct Browser Request"}
+                title={request.useProxy ? "Proxy Enabled" : "Proxy Disabled"}
               >
-                <Globe size={16} />
+                <Globe size={14} />
               </button>
             </div>
           </div>
 
-          <button
-            onClick={() => setShowCodeModal(true)}
-            className="px-3 bg-surfaceHighlight hover:bg-surfaceLight text-textSecondary hover:text-foreground rounded-lg transition-all"
-            title="Generate Code"
-          >
-            <Code size={16} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowCodeModal(true)}
+              className="p-2.5 text-textSecondary hover:text-foreground hover:bg-surfaceLight rounded-lg transition-all border border-transparent hover:border-border"
+              title="Generate Code"
+            >
+              <Code size={16} />
+            </button>
 
-          <button
-            onClick={() => setShowMetadataModal(true)}
-            className="px-3 bg-surfaceHighlight hover:bg-surfaceLight text-textSecondary hover:text-foreground rounded-lg transition-all"
-            title="Request Metadata"
-          >
-            <Info size={16} />
-          </button>
+            <button
+              onClick={() => setShowMetadataModal(true)}
+              className="p-2.5 text-textSecondary hover:text-foreground hover:bg-surfaceLight rounded-lg transition-all"
+              title="Request Metadata"
+            >
+              <Info size={16} />
+            </button>
 
-          <button
-            onClick={onSave}
-            className="px-4 bg-surfaceHighlight hover:bg-surfaceLight text-foreground font-bold rounded-lg flex items-center gap-2 transition-all active:scale-95"
-            title={isSavedRequest ? "Update Request" : "Save to Collection"}
-          >
-            <Save size={16} />
-            <span className="hidden xl:inline">{isSavedRequest ? 'Update' : 'Save'}</span>
-          </button>
-
-          <button
-            onClick={onSend}
-            disabled={loading}
-            className={`px-6 bg-primary hover:bg-primaryHover text-white font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 ${loading ? 'opacity-70 cursor-not-allowed' : 'active:scale-95'}`}
-          >
-            {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
-            ) : (
-              <Play size={16} fill="currentColor" />
-            )}
-            <span className="hidden sm:inline">{loading ? 'Sending' : 'Send'}</span>
-          </button>
+            <div className="flex items-center ml-1 overflow-hidden rounded-lg shadow-lg">
+              <button
+                onClick={onSave}
+                className="h-10 px-4 bg-surfaceHighlight hover:bg-surfaceLight text-foreground font-bold text-xs flex items-center gap-2 border-r border-background transition-all"
+                title={isSavedRequest ? "Update Request" : "Save Request"}
+              >
+                <Save size={14} />
+                <span className="hidden xl:inline">{isSavedRequest ? 'Update' : 'Save'}</span>
+              </button>
+              <button
+                onClick={onSend}
+                disabled={loading}
+                className={`h-10 px-6 bg-primary hover:bg-primaryHover text-white font-bold text-xs flex items-center gap-2 transition-all ${loading ? 'opacity-70' : 'active:brightness-110'}`}
+              >
+                {loading ? (
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-white/30 border-t-white"></div>
+                ) : (
+                  <Play size={14} fill="currentColor" />
+                )}
+                <span>{loading ? 'Sending' : 'Send'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Configuration Tabs */}
-      <div className="flex px-2 pt-2 border-b border-border bg-surface relative z-30">
+      <div className="flex px-4 border-b border-border bg-surface relative z-30">
         {[
           { id: 'params', label: 'Params', icon: Link },
           { id: 'headers', label: 'Headers', icon: Layers },
           { id: 'auth', label: 'Auth', icon: Shield },
           { id: 'body', label: 'Body', icon: FileJson },
-          { id: 'tests', label: 'Tests', icon: CheckCircle2 }
+          { id: 'tests', label: 'Tests', icon: CheckCircle2 },
+          { id: 'scripts', label: 'Scripts', icon: Terminal }
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all ${activeTab === tab.id
-              ? 'border-primary text-primary bg-primary/5 rounded-t-lg'
-              : 'border-transparent text-textSecondary hover:text-foreground hover:bg-surfaceLight/30 rounded-t-lg'
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all relative ${activeTab === tab.id
+              ? 'border-primary text-primary'
+              : 'border-transparent text-textSecondary hover:text-foreground'
               }`}
           >
-            <tab.icon size={14} className={activeTab === tab.id ? 'text-primary' : ''} />
+            <tab.icon size={13} className={activeTab === tab.id ? 'text-primary' : 'text-textSecondary/50'} />
             {tab.label}
-            {tab.id === 'params' && request.params && request.params.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
-            {tab.id === 'headers' && request.headers && request.headers.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
-            {tab.id === 'tests' && request.testCases && request.testCases.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>}
+            {tab.id === 'params' && request.params && request.params.filter(p => p.enabled).length > 0 && <span className="absolute top-2 right-2 w-1 h-1 rounded-full bg-primary/60"></span>}
+            {tab.id === 'headers' && request.headers && request.headers.filter(p => p.enabled).length > 0 && <span className="absolute top-2 right-2 w-1 h-1 rounded-full bg-primary/60"></span>}
+            {tab.id === 'tests' && request.testCases && request.testCases.filter(p => p.enabled).length > 0 && <span className="absolute top-2 right-2 w-1 h-1 rounded-full bg-primary shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>}
+            {tab.id === 'scripts' && request.postRequestScript && <span className="absolute top-2 right-2 w-1 h-1 rounded-full bg-primary/60"></span>}
           </button>
         ))}
       </div>
@@ -236,6 +242,14 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
             <RequestTests
               request={request}
               onRequestChange={onRequestChange}
+            />
+          )}
+
+          {activeTab === 'scripts' && (
+            <RequestScripts
+              request={request}
+              onRequestChange={onRequestChange}
+              environmentVariables={environmentVariables}
             />
           )}
         </div>

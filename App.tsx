@@ -27,7 +27,8 @@ const DEFAULT_REQUEST: ApiRequest = {
   graphqlVariables: '{\n\t\n}',
   auth: { type: AuthMethod.NONE },
   useProxy: true,
-  testCases: []
+  testCases: [],
+  postRequestScript: ''
 };
 
 const DEFAULT_WORKSPACE: Workspace = {
@@ -101,7 +102,7 @@ const App: React.FC = () => {
   const response = activeTab?.response || null;
   const [loading, setLoading] = useState(false);
   const [layoutMode, setLayoutMode] = useState<'horizontal' | 'vertical'>('horizontal');
-  type Theme = 'dark' | 'light' | 'midnight' | 'aubergine' | 'nord' | 'forest' | 'hacker';
+  type Theme = 'dark' | 'light' | 'midnight' | 'aubergine' | 'nord' | 'forest' | 'hacker' | 'dream-orange';
   const [theme, setTheme] = useState<Theme>('dark');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
@@ -296,13 +297,14 @@ const App: React.FC = () => {
 
   const applyThemeToElement = (t: Theme) => {
     const root = document.documentElement;
-    root.classList.remove('light', 'theme-midnight', 'theme-aubergine', 'theme-nord', 'theme-forest', 'theme-hacker');
+    root.classList.remove('light', 'theme-midnight', 'theme-aubergine', 'theme-nord', 'theme-forest', 'theme-hacker', 'theme-dream-orange');
     if (t === 'light') root.classList.add('light');
     else if (t === 'midnight') root.classList.add('theme-midnight');
     else if (t === 'aubergine') root.classList.add('theme-aubergine');
     else if (t === 'nord') root.classList.add('theme-nord');
     else if (t === 'forest') root.classList.add('theme-forest');
     else if (t === 'hacker') root.classList.add('theme-hacker');
+    else if (t === 'dream-orange') root.classList.add('theme-dream-orange');
   };
 
   const cycleBrightness = () => {
@@ -1302,6 +1304,70 @@ const App: React.FC = () => {
     }
   };
 
+  const executePostRequestScript = (script: string, request: ApiRequest, response: ApiResponse): string[] => {
+    if (!script) return [];
+    const logs: string[] = [];
+
+    try {
+      const activeEnv = environments.find(e => e.id === activeEnvId);
+
+      let currentVars = activeEnv ? [...activeEnv.variables] : [];
+      let envChanged = false;
+
+      const formatArg = (arg: any) => {
+        if (typeof arg === 'object') return JSON.stringify(arg, null, 2);
+        return String(arg);
+      };
+
+      const ctx = {
+        request,
+        response,
+        env: {
+          set: (key: string, value: string) => {
+            const index = currentVars.findIndex(v => v.key === key);
+            if (index !== -1) {
+              currentVars[index] = { ...currentVars[index], value: String(value) };
+            } else {
+              currentVars.push({ id: `var_${Date.now()}`, key, value: String(value), enabled: true });
+            }
+            envChanged = true;
+          },
+          get: (key: string) => {
+            return currentVars.find(v => v.key === key)?.value;
+          }
+        },
+        toast: (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+          addToast(message, type);
+        },
+        console: {
+          log: (...args: any[]) => {
+            const msg = args.map(formatArg).join(' ');
+            logs.push(msg);
+            console.log('[Script Log]', msg);
+          },
+          error: (...args: any[]) => {
+            const msg = args.map(formatArg).join(' ');
+            logs.push(`ERROR: ${msg}`);
+            console.error('[Script Error]', msg);
+          }
+        }
+      };
+
+      const runner = new Function('ctx', script);
+      runner(ctx);
+
+      if (envChanged && activeEnv) {
+        updateEnvironment(activeEnv.id, { variables: currentVars });
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logs.push(`RUNTIME ERROR: ${errorMsg}`);
+      console.error('Post-request script error:', err);
+      addToast(`Script Error: ${errorMsg}`, 'error');
+    }
+    return logs;
+  };
+
   const handleSendRequest = async () => {
     setLoading(true);
     setRequestTabs(prev => prev.map(tab =>
@@ -1323,8 +1389,17 @@ const App: React.FC = () => {
       const envVars = activeEnv ? activeEnv.variables : [];
 
       const result = await executeRequest(request, envVars);
+
+      // Execute post-request script
+      let logs: string[] = [];
+      if (request.postRequestScript) {
+        logs = executePostRequestScript(request.postRequestScript, request, result);
+      }
+
+      const finalResult = { ...result, scriptLogs: logs };
+
       setRequestTabs(prev => prev.map(tab =>
-        tab.id === activeTabId ? { ...tab, response: result } : tab
+        tab.id === activeTabId ? { ...tab, response: finalResult } : tab
       ));
 
       // Save to backend history if workspace has backendId
@@ -1838,10 +1913,10 @@ const App: React.FC = () => {
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary/40 group-focus-within/search:text-primary transition-colors" />
               <input
                 type="text"
-                placeholder="Filter..."
+                placeholder="Filter collections..."
                 value={sidebarSearchQuery}
                 onChange={(e) => setSidebarSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-surfaceLight/30 border border-white/5 focus:border-primary/30 rounded-xl text-[12px] text-foreground placeholder-textSecondary/30 outline-none transition-all focus:bg-surfaceLight/50"
+                className="w-full pl-9 pr-3 py-2 bg-surface border border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-xl text-[12px] text-foreground placeholder-textSecondary/50 outline-none transition-all shadow-inner"
               />
             </div>
           </div>
@@ -2112,6 +2187,7 @@ const App: React.FC = () => {
                         { id: 'nord', label: 'Nord Ice', color: '#2e3440' },
                         { id: 'forest', label: 'Emerald Forest', color: '#064e3b' },
                         { id: 'hacker', label: 'Hacker/Matrix', color: '#050505' },
+                        { id: 'dream-orange', label: 'Dream Orange', color: '#ff7900' },
                       ].map((t) => (
                         <button
                           key={t.id}
@@ -2326,10 +2402,10 @@ const App: React.FC = () => {
             </>
           )}
 
-          <div className="flex flex-row overflow-hidden flex-1 gap-4">
-            <div className={`flex ${showAiPanel ? 'flex-col' : (layoutMode === 'horizontal' ? 'flex-row' : 'flex-col')} gap-4 overflow-hidden flex-1 transition-all duration-300`}>
+          <div className="flex flex-row overflow-hidden flex-1 border-t border-border bg-background">
+            <div className={`flex ${showAiPanel ? 'flex-col' : (layoutMode === 'horizontal' ? 'flex-row' : 'flex-col')} overflow-hidden flex-1 transition-all duration-300`}>
               {/* Request Panel (Left/Top) */}
-              <div className="flex-1 flex flex-col min-w-[400px] bg-surfaceLight/20 rounded-2xl relative overflow-hidden transition-all duration-300">
+              <div className={`flex-1 flex flex-col min-w-[400px] border-border relative overflow-hidden transition-all duration-300 ${layoutMode === 'horizontal' ? 'border-r' : 'border-b'}`}>
                 <RequestPanel
                   request={request}
                   onRequestChange={handleRequestChange}
@@ -2343,7 +2419,7 @@ const App: React.FC = () => {
               </div>
 
               {/* Response Panel (Right/Bottom) */}
-              <div className="flex-1 flex flex-col min-w-[400px] bg-surfaceLight/20 rounded-2xl overflow-hidden transition-all duration-300">
+              <div className="flex-1 flex flex-col min-w-[400px] overflow-hidden transition-all duration-300">
                 <ResponsePanel response={response} loading={loading} addToast={addToast} />
               </div>
             </div>
