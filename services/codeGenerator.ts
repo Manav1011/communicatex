@@ -25,10 +25,10 @@ const getHeaders = (request: ApiRequest): Record<string, string> => {
 };
 
 const getBody = (request: ApiRequest): string | null => {
-  if (request.method === HttpMethod.GET) return null;
+  if ([HttpMethod.GET, HttpMethod.HEAD].includes(request.method)) return null;
 
   if (request.bodyType === 'json') return request.bodyContent;
-  
+
   if (request.bodyType === 'graphql') {
     return JSON.stringify({
       query: request.graphqlQuery,
@@ -39,7 +39,7 @@ const getBody = (request: ApiRequest): string | null => {
   if (request.bodyType === 'x-www-form-urlencoded') {
     const params = new URLSearchParams();
     request.formEncodedParams.forEach(p => {
-        if(p.enabled) params.append(p.key, p.value);
+      if (p.enabled) params.append(p.key, p.value);
     });
     return params.toString();
   }
@@ -49,7 +49,7 @@ const getBody = (request: ApiRequest): string | null => {
 
 export const generateCurl = (request: ApiRequest): string => {
   let cmd = `curl -X ${request.method} '${request.url}'`;
-  
+
   const headers = getHeaders(request);
   Object.entries(headers).forEach(([k, v]) => {
     cmd += ` \\\n  -H '${k}: ${v}'`;
@@ -70,7 +70,7 @@ export const generateJavascript = (request: ApiRequest): string => {
   const body = getBody(request);
 
   let optionsStr = `  method: '${request.method}',\n`;
-  
+
   if (Object.keys(headers).length > 0) {
     optionsStr += `  headers: ${JSON.stringify(headers, null, 4).replace(/"/g, "'")},\n`;
   }

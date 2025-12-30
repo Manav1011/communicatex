@@ -36,8 +36,8 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
 
     // If input is currently masked as password, we cannot get cursor position to do autocomplete
     if (renderType === 'password') {
-        setShowSuggestions(false);
-        return;
+      setShowSuggestions(false);
+      return;
     }
 
     const idx = e.target.selectionStart || 0;
@@ -58,26 +58,26 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   const handleSelect = (variableKey: string) => {
     const textBeforeCursor = value.slice(0, cursorIndex);
     const textAfterCursor = value.slice(cursorIndex);
-    
+
     // Find the last occurrence of '<<' before cursor
     const lastOpenIndex = textBeforeCursor.lastIndexOf('<<');
     if (lastOpenIndex === -1) return;
 
-    const newValue = 
-      value.slice(0, lastOpenIndex) + 
-      `<<${variableKey}>>` + 
+    const newValue =
+      value.slice(0, lastOpenIndex) +
+      `<<${variableKey}>>` +
       textAfterCursor;
-    
+
     onChange(newValue);
     setShowSuggestions(false);
-    
+
     // Restore focus
     setTimeout(() => {
-        inputRef.current?.focus();
+      inputRef.current?.focus();
     }, 0);
   };
 
-  const filteredVars = variables.filter(v => 
+  const filteredVars = variables.filter(v =>
     v.enabled && v.key.toLowerCase().includes(filter.toLowerCase())
   );
 
@@ -109,7 +109,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
           type="button"
           tabIndex={-1}
           onClick={() => setIsPasswordVisible(!isPasswordVisible)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-white transition-colors z-10"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-foreground transition-colors z-10"
         >
           {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
@@ -118,18 +118,18 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       {showSuggestions && filteredVars.length > 0 && (
         <div className="absolute left-0 top-full mt-1 w-64 max-h-48 overflow-y-auto bg-surfaceHighlight border border-border rounded-lg shadow-2xl z-50 animate-in fade-in zoom-in-95">
           <div className="text-[10px] uppercase font-bold text-textSecondary px-2 py-1 bg-surface sticky top-0 border-b border-border">
-              Environment Variables
+            Environment Variables
           </div>
           {filteredVars.map(v => (
             <button
               key={v.id}
-              className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-primary/20 hover:text-white transition-colors flex justify-between group border-b border-border/50 last:border-0"
+              className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-primary/20 hover:text-foreground transition-colors flex justify-between group border-b border-border last:border-0"
               onClick={() => handleSelect(v.key)}
               onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
             >
               <span className="font-mono font-bold text-primary">{v.key}</span>
-              <span className="text-xs text-textSecondary truncate max-w-[100px] group-hover:text-zinc-300 font-mono opacity-70">
-                  {v.value}
+              <span className="text-xs text-textSecondary truncate max-w-[100px] group-hover:text-foreground font-mono opacity-70">
+                {v.value}
               </span>
             </button>
           ))}

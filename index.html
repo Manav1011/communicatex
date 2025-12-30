@@ -1,70 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CommunicateX API Client</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              background: '#050505', // Deep Black
-              surface: '#0a0a0a',    // Almost Black
-              surfaceLight: '#18181b', // Zinc 900
-              surfaceHighlight: '#27272a', // Zinc 800
-              primary: '#ea580c',    // Orange 600
-              primaryHover: '#c2410c', // Orange 700
-              accent: '#f97316',     // Orange 500
-              danger: '#ef4444',     // Red 500
-              success: '#10b981',    // Emerald 500
-              border: '#27272a',     // Zinc 800
-              textSecondary: '#a1a1aa', // Zinc 400
-            },
-            fontFamily: {
-              sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
-            }
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CommunicateX API Client</title>
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><defs><linearGradient id=%22g%22 x1=%220%%22 y1=%220%%22 x2=%22100%%22 y2=%22100%%22><stop offset=%220%%22 style=%22stop-color:%233b82f6;stop-opacity:1%22 /><stop offset=%22100%%22 style=%22stop-color:%232563eb;stop-opacity:1%22 /></linearGradient></defs><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22url(%23g)%22/><path d=%22M30 50 L45 65 L70 35%22 fill=%22none%22 stroke=%22white%22 stroke-width=%2210%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/><circle cx=%2270%22 cy=%2235%22 r=%225%22 fill=%22%2360a5fa%22><animate attributeName=%22r%22 values=%225;8;5%22 dur=%222s%22 repeatCount=%22indefinite%22/></circle></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            background: 'var(--background)',
+            surface: 'var(--surface)',
+            surfaceLight: 'var(--surface-light)',
+            surfaceHighlight: 'var(--surface-highlight)',
+            primary: 'var(--primary)',
+            primaryHover: 'var(--primary-hover)',
+            accent: 'var(--accent)',
+            danger: 'var(--danger)',
+            success: 'var(--success)',
+            border: 'var(--border)',
+            textSecondary: 'var(--text-secondary)',
+            foreground: 'var(--foreground)',
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
           }
         }
       }
-    </script>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    }
+  </script>
+  <style>
+    :root {
+      --background: #000000;
+      --surface: #0a0a0a;
+      --surface-light: #121212;
+      --surface-highlight: #1a1a1a;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #60a5fa;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #27272a;
+      --text-secondary: #a1a1aa;
+      --foreground: #ffffff;
+    }
 
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #050505; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #27272a; 
-        border-radius: 5px;
-        border: 2px solid #050505;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #3f3f46; 
-      }
-      body {
-        background-color: #050505;
-        color: #fafafa;
-        font-family: 'Inter', sans-serif;
-      }
-      
-      /* Subtle glow effect for active elements */
-      .glow-primary {
-        box-shadow: 0 0 20px -5px rgba(234, 88, 12, 0.3);
-      }
-    </style>
-    <!-- Vite will load and transform this module; it mounts React into #root -->
-    <script type="module" src="/index.tsx"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+    .light {
+      --background: #ffffff;
+      --surface: #fafafa;
+      --surface-light: #f4f4f5;
+      --surface-highlight: #e4e4e7;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --accent: #3b82f6;
+      --danger: #dc2626;
+      --success: #059669;
+      --border: #e4e4e7;
+      --text-secondary: #71717a;
+      --foreground: #09090b;
+    }
+
+    .theme-midnight {
+      --background: #0f172a;
+      --surface: #1e293b;
+      --surface-light: #334155;
+      --surface-highlight: #475569;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --accent: #818cf8;
+      --danger: #f43f5e;
+      --success: #10b981;
+      --border: #1e293b;
+      --text-secondary: #94a3b8;
+      --foreground: #f8fafc;
+    }
+
+    .theme-aubergine {
+      --background: #1a1d21;
+      --surface: #222529;
+      --surface-light: #2c3036;
+      --surface-highlight: #353a41;
+      --primary: #611f69;
+      --primary-hover: #4a154b;
+      --accent: #e01e5a;
+      --danger: #e01e5a;
+      --success: #2eb67d;
+      --border: #4a154b33;
+      --text-secondary: #ababad;
+      --foreground: #ffffff;
+    }
+
+    .theme-nord {
+      --background: #2e3440;
+      --surface: #3b4252;
+      --surface-light: #434c5e;
+      --surface-highlight: #4c566a;
+      --primary: #88c0d0;
+      --primary-hover: #81a1c1;
+      --accent: #b48ead;
+      --danger: #bf616a;
+      --success: #a3be8c;
+      --border: #434c5e;
+      --text-secondary: #d8dee9;
+      --foreground: #eceff4;
+    }
+
+    .theme-forest {
+      --background: #064e3b;
+      --surface: #065f46;
+      --surface-light: #047857;
+      --surface-highlight: #059669;
+      --primary: #10b981;
+      --primary-hover: #34d399;
+      --accent: #fbbf24;
+      --danger: #ef4444;
+      --success: #34d399;
+      --border: #065f46;
+      --text-secondary: #d1fae5;
+      --foreground: #ffffff;
+    }
+
+    .theme-hacker {
+      --background: #050505;
+      --surface: #0a0a0a;
+      --surface-light: #0f0f0f;
+      --surface-highlight: #1a1a1a;
+      --primary: #00ff41;
+      --primary-hover: #00cc33;
+      --accent: #00ff41;
+      --danger: #ff0000;
+      --success: #00ff41;
+      --border: #003310;
+      --text-secondary: #008f11;
+      --foreground: #00ff41;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--background);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--surface-highlight);
+      border-radius: 5px;
+      border: 2px solid var(--background);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--border);
+    }
+
+    body {
+      background-color: var(--background);
+      color: var(--foreground);
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Subtle glow effect for active elements */
+    .glow-primary {
+      box-shadow: 0 0 20px -5px rgba(37, 99, 235, 0.3);
+    }
+
+    /* Input placeholders */
+    .light ::placeholder {
+      color: #94a3b8 !important;
+    }
+
+    ::placeholder {
+      color: #52525b !important;
+    }
+  </style>
+  <!-- Vite will load and transform this module; it mounts React into #root -->
+  <script type="module" src="/index.tsx"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
 </html>

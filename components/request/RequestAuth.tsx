@@ -20,13 +20,13 @@ const RequestAuth: React.FC<RequestAuthProps> = ({ request, onRequestChange, env
   return (
     <div className="h-full flex flex-col max-w-xl animate-in fade-in duration-300">
       <div className="mb-6">
-          <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Authentication Type</label>
-          <CustomSelect 
-            value={request.auth.type}
-            onChange={(val) => onRequestChange({...request, auth: { ...request.auth, type: val as AuthMethod }})}
-            options={authOptions}
-            className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-sm text-zinc-200"
-          />
+        <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Authentication Type</label>
+        <CustomSelect
+          value={request.auth.type}
+          onChange={(val) => onRequestChange({ ...request, auth: { ...request.auth, type: val as AuthMethod } })}
+          options={authOptions}
+          className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-sm text-foreground"
+        />
       </div>
 
       {request.auth.type === AuthMethod.BEARER && (
@@ -36,10 +36,10 @@ const RequestAuth: React.FC<RequestAuthProps> = ({ request, onRequestChange, env
             <AutocompleteInput
               type="textarea"
               value={request.auth.token || ''}
-              onChange={(val) => onRequestChange({...request, auth: { ...request.auth, token: val }})}
+              onChange={(val) => onRequestChange({ ...request, auth: { ...request.auth, token: val } })}
               variables={environmentVariables}
               placeholder="Enter your JWT or OAuth token here"
-              className="w-full h-full bg-transparent p-3 text-sm text-zinc-200 font-mono outline-none resize-none placeholder-zinc-600"
+              className="w-full h-full bg-transparent p-3 text-sm text-foreground font-mono outline-none resize-none placeholder-zinc-600"
             />
           </div>
         </div>
@@ -50,24 +50,24 @@ const RequestAuth: React.FC<RequestAuthProps> = ({ request, onRequestChange, env
           <div>
             <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Username</label>
             <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-               <AutocompleteInput 
-                  value={request.auth.username || ''}
-                  onChange={(val) => onRequestChange({...request, auth: { ...request.auth, username: val }})}
-                  variables={environmentVariables}
-                  className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                />
+              <AutocompleteInput
+                value={request.auth.username || ''}
+                onChange={(val) => onRequestChange({ ...request, auth: { ...request.auth, username: val } })}
+                variables={environmentVariables}
+                className="w-full bg-transparent p-3 text-sm text-foreground outline-none"
+              />
             </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Password</label>
-             <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-                <AutocompleteInput 
-                    type="password"
-                    value={request.auth.password || ''}
-                    onChange={(val) => onRequestChange({...request, auth: { ...request.auth, password: val }})}
-                    variables={environmentVariables}
-                    className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                />
+            <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
+              <AutocompleteInput
+                type="password"
+                value={request.auth.password || ''}
+                onChange={(val) => onRequestChange({ ...request, auth: { ...request.auth, password: val } })}
+                variables={environmentVariables}
+                className="w-full bg-transparent p-3 text-sm text-foreground outline-none"
+              />
             </div>
           </div>
         </div>
@@ -76,61 +76,61 @@ const RequestAuth: React.FC<RequestAuthProps> = ({ request, onRequestChange, env
       {request.auth.type === AuthMethod.API_KEY && (
         <div className="space-y-5">
           <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Key</label>
-                 <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-                    <AutocompleteInput 
-                        placeholder="X-API-KEY"
-                        value={request.auth.apiKeyKey || ''}
-                        onChange={(val) => onRequestChange({...request, auth: { ...request.auth, apiKeyKey: val }})}
-                        variables={environmentVariables}
-                        className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                    />
-                </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Key</label>
+              <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
+                <AutocompleteInput
+                  placeholder="X-API-KEY"
+                  value={request.auth.apiKeyKey || ''}
+                  onChange={(val) => onRequestChange({ ...request, auth: { ...request.auth, apiKeyKey: val } })}
+                  variables={environmentVariables}
+                  className="w-full bg-transparent p-3 text-sm text-foreground outline-none"
+                />
               </div>
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Value</label>
-                 <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
-                    <AutocompleteInput 
-                        placeholder="Key Value"
-                        value={request.auth.apiKeyValue || ''}
-                        onChange={(val) => onRequestChange({...request, auth: { ...request.auth, apiKeyValue: val }})}
-                        variables={environmentVariables}
-                        className="w-full bg-transparent p-3 text-sm text-zinc-200 outline-none"
-                    />
-                </div>
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Value</label>
+              <div className="bg-surfaceLight border border-border rounded-lg focus-within:border-primary relative focus-within:z-10">
+                <AutocompleteInput
+                  placeholder="Key Value"
+                  value={request.auth.apiKeyValue || ''}
+                  onChange={(val) => onRequestChange({ ...request, auth: { ...request.auth, apiKeyValue: val } })}
+                  variables={environmentVariables}
+                  className="w-full bg-transparent p-3 text-sm text-foreground outline-none"
+                />
               </div>
+            </div>
           </div>
           <div>
-              <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-3">Add To</label>
-              <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.auth.apiKeyLocation === 'header' ? 'border-primary' : 'border-zinc-600'}`}>
-                        {request.auth.apiKeyLocation === 'header' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        className="hidden"
-                        name="apikey_loc" 
-                        checked={request.auth.apiKeyLocation === 'header'} 
-                        onChange={() => onRequestChange({...request, auth: {...request.auth, apiKeyLocation: 'header'}})}
-                      />
-                      <span className="text-sm text-zinc-300 group-hover:text-white">Header</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.auth.apiKeyLocation === 'query' ? 'border-primary' : 'border-zinc-600'}`}>
-                        {request.auth.apiKeyLocation === 'query' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        className="hidden"
-                        name="apikey_loc" 
-                        checked={request.auth.apiKeyLocation === 'query'} 
-                        onChange={() => onRequestChange({...request, auth: {...request.auth, apiKeyLocation: 'query'}})}
-                      />
-                      <span className="text-sm text-zinc-300 group-hover:text-white">Query Params</span>
-                  </label>
-              </div>
+            <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-3">Add To</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.auth.apiKeyLocation === 'header' ? 'border-primary' : 'border-border'}`}>
+                  {request.auth.apiKeyLocation === 'header' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
+                </div>
+                <input
+                  type="radio"
+                  className="hidden"
+                  name="apikey_loc"
+                  checked={request.auth.apiKeyLocation === 'header'}
+                  onChange={() => onRequestChange({ ...request, auth: { ...request.auth, apiKeyLocation: 'header' } })}
+                />
+                <span className="text-sm text-textSecondary group-hover:text-foreground">Header</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${request.auth.apiKeyLocation === 'query' ? 'border-primary' : 'border-border'}`}>
+                  {request.auth.apiKeyLocation === 'query' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
+                </div>
+                <input
+                  type="radio"
+                  className="hidden"
+                  name="apikey_loc"
+                  checked={request.auth.apiKeyLocation === 'query'}
+                  onChange={() => onRequestChange({ ...request, auth: { ...request.auth, apiKeyLocation: 'query' } })}
+                />
+                <span className="text-sm text-textSecondary group-hover:text-foreground">Query Params</span>
+              </label>
+            </div>
           </div>
         </div>
       )}

@@ -5,6 +5,8 @@ export enum HttpMethod {
   PUT = 'PUT',
   PATCH = 'PATCH',
   DELETE = 'DELETE',
+  HEAD = 'HEAD',
+  OPTIONS = 'OPTIONS',
 }
 
 export enum AuthMethod {
@@ -50,7 +52,7 @@ export interface ApiRequest {
   url: string;
   params: KeyValueItem[];
   headers: KeyValueItem[];
-  
+
   // Body Config
   bodyType: BodyType;
   bodyContent: string; // Used for JSON
@@ -136,3 +138,9 @@ export const MOCK_USER: User = {
   email: 'demo@communicatex.dev',
   name: 'CommunicateX Developer',
 };
+
+export interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}

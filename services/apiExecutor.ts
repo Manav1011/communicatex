@@ -18,7 +18,7 @@ const PROXY_URL = `${API_BASE_URL}/proxy`;
 
 export const executeRequest = async (request: ApiRequest, environmentVariables: KeyValueItem[] = []): Promise<ApiResponse> => {
   const startTime = performance.now();
-  
+
   // Create a map for O(1) lookup of variables
   const varMap: Record<string, string> = {};
   environmentVariables.forEach(v => {
@@ -29,13 +29,13 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
 
   // Interpolate URL
   let finalUrl = interpolate(request.url, varMap);
-  
+
   // Construct URL with interpolated params
   let urlObj: URL;
   try {
     // If URL doesn't have protocol, default to http for construction
     if (!finalUrl.startsWith('http')) {
-        finalUrl = 'https://' + finalUrl;
+      finalUrl = 'https://' + finalUrl;
     }
     urlObj = new URL(finalUrl);
   } catch (e) {
@@ -71,7 +71,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
   } else if (request.auth.type === AuthMethod.API_KEY && request.auth.apiKeyKey && request.auth.apiKeyValue) {
     const key = interpolate(request.auth.apiKeyKey, varMap);
     const value = interpolate(request.auth.apiKeyValue, varMap);
-    
+
     if (request.auth.apiKeyLocation === 'header') {
       headers.set(key, value);
     } else {
@@ -81,7 +81,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
 
   // Handle Body Generation
   let body: BodyInit | null = null;
-  const methodHasBody = request.method !== HttpMethod.GET;
+  const methodHasBody = ![HttpMethod.GET, HttpMethod.HEAD].includes(request.method);
 
   if (methodHasBody) {
     if (request.bodyType === 'json' && request.bodyContent) {
@@ -97,7 +97,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
       const params = new URLSearchParams();
       request.formEncodedParams.forEach(p => {
         if (p.enabled && p.key) {
-           params.append(interpolate(p.key, varMap), interpolate(p.value, varMap));
+          params.append(interpolate(p.key, varMap), interpolate(p.value, varMap));
         }
       });
       body = params.toString();
@@ -121,7 +121,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
         const query = interpolate(request.graphqlQuery, varMap);
         const varsStr = interpolate(request.graphqlVariables || '{}', varMap);
         const variables = JSON.parse(varsStr);
-        
+
         body = JSON.stringify({ query, variables });
         headers.set('Content-Type', 'application/json');
       } catch (e) {
@@ -147,13 +147,13 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
       // Proxy needs a serializable body. FormData (multipart) is hard to serialize to JSON for the proxy.
       // For now, if using proxy + multipart, we convert to simple object (loses file capability, but OK for text)
       let proxyBody = body;
-      
+
       if (request.bodyType === 'form-data' && body instanceof FormData) {
         // Full multipart with real files via proxy is not yet supported.
         // This avoids silently stripping files; instead we guide the user.
         throw new Error('File uploads are not supported when Proxy Mode is enabled. Disable Proxy to send multipart/form-data with files.');
-      } 
-      
+      }
+
       // Since server.js is simple, let's keep body strict string or JSON
       if (typeof proxyBody !== 'string' && !(proxyBody instanceof FormData)) {
         proxyBody = JSON.stringify(proxyBody);
@@ -173,7 +173,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
       });
 
       if (!proxyRes.ok) {
-         throw new Error(`Proxy Server Error: ${proxyRes.statusText}`);
+        throw new Error(`Proxy Server Error: ${proxyRes.statusText}`);
       }
 
       const proxyData: ApiResponse = await proxyRes.json();
@@ -185,7 +185,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
         method: request.method,
         headers,
         body,
-        mode: 'cors', 
+        mode: 'cors',
       });
 
       const endTime = performance.now();
@@ -193,7 +193,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
       size = Number(res.headers.get('content-length')) || 0;
       statusCode = res.status;
       statusText = res.statusText;
-      
+
       res.headers.forEach((val, key) => {
         resHeaders[key] = val;
       });
@@ -216,7 +216,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
     }
 
   } catch (error: any) {
-     return {
+    return {
       statusCode: 0,
       statusText: 'Network Error',
       time: 0,

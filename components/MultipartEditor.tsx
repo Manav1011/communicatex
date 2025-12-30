@@ -63,57 +63,58 @@ const MultipartEditor: React.FC<MultipartEditorProps> = ({ items, onChange, titl
         </button>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden flex-1 overflow-y-auto bg-surfaceLight/30">
+      <div className="rounded-xl overflow-hidden flex-1 overflow-y-auto bg-surface/50 shadow-inner">
         {items.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-8 text-center text-textSecondary opacity-60">
+          <div className="h-full flex flex-col items-center justify-center p-8 text-center text-textSecondary opacity-50">
             <span className="text-sm italic">No {title.toLowerCase()} configured.</span>
-            <button onClick={addItem} className="mt-2 text-xs text-primary hover:underline">
-              Add one now
-            </button>
+            <button onClick={addItem} className="mt-4 text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full hover:bg-primary/20 transition-all">Add one now</button>
           </div>
         ) : (
-          items.map(item => (
+          items.map((item, index) => (
             <div
               key={item.id}
-              className="flex border-b border-border last:border-b-0 group transition-colors hover:bg-surfaceLight/50"
+              className={`flex group transition-colors ${index % 2 === 0 ? 'bg-white/[0.02]' : 'bg-transparent'} hover:bg-primary/5`}
             >
               {/* Enabled toggle */}
               <button
                 onClick={() => handleChange(item.id, { enabled: !item.enabled })}
-                className="w-10 flex items-center justify-center text-textSecondary hover:text-primary transition-colors border-right border-border"
+                className="w-10 flex items-center justify-center text-textSecondary hover:text-primary transition-colors"
               >
                 {item.enabled ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
               </button>
 
               {/* Key */}
-              <div className="flex-1 border-r border-border min-w-0">
+              <div className="flex-1 min-w-0">
                 <input
                   value={item.key}
                   onChange={e => handleChange(item.id, { key: e.target.value })}
                   placeholder="Key"
-                  className={`w-full bg-transparent px-2.5 py-2.5 text-sm outline-none text-zinc-200 placeholder-zinc-600 font-mono ${
-                    !item.enabled && 'opacity-50 line-through text-textSecondary'
-                  }`}
+                  className={`w-full bg-transparent px-2.5 py-2.5 text-sm outline-none text-foreground placeholder-zinc-700 font-mono ${!item.enabled && 'opacity-50 line-through text-textSecondary'
+                    }`}
                 />
               </div>
 
+              <div className="w-px bg-white/5 my-2"></div>
+
               {/* Type selector */}
-              <div className="w-28 border-r border-border flex items-center justify-center">
+              <div className="w-28 flex items-center justify-center">
                 <select
                   value={item.valueType}
                   onChange={e => handleValueTypeChange(item.id, e.target.value as MultipartValueType)}
-                  className="bg-transparent text-xs text-textSecondary px-2 py-1 rounded outline-none cursor-pointer"
+                  className="bg-transparent text-[10px] uppercase font-bold text-textSecondary px-2 py-1 rounded outline-none cursor-pointer hover:text-foreground transition-colors"
                 >
                   <option value="text">Text</option>
                   <option value="file">File</option>
                 </select>
               </div>
 
+              <div className="w-px bg-white/5 my-2"></div>
+
               {/* Value / File picker */}
               <div className="flex-1 min-w-0 flex items-center px-2.5">
                 {item.valueType === 'file' ? (
-                  <label className="flex items-center gap-2 text-sm text-zinc-200 cursor-pointer">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-surfaceHighlight text-xs text-textSecondary border border-border">
+                  <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surfaceHighlight text-[10px] font-bold uppercase text-textSecondary hover:text-foreground transition-all">
                       <Paperclip size={12} />
                       Choose file
                     </span>
@@ -127,7 +128,7 @@ const MultipartEditor: React.FC<MultipartEditorProps> = ({ items, onChange, titl
                         <FileText size={12} /> {item.file.name}
                       </span>
                     ) : (
-                      <span className="text-xs text-textSecondary italic">No file selected</span>
+                      <span className="text-xs text-textSecondary italic opacity-50">No file selected</span>
                     )}
                   </label>
                 ) : (
@@ -135,9 +136,8 @@ const MultipartEditor: React.FC<MultipartEditorProps> = ({ items, onChange, titl
                     value={item.value}
                     onChange={e => handleChange(item.id, { value: e.target.value })}
                     placeholder="Value"
-                    className={`w-full bg-transparent text-sm outline-none text-zinc-200 placeholder-zinc-600 font-mono ${
-                      !item.enabled && 'opacity-50 text-textSecondary'
-                    }`}
+                    className={`w-full bg-transparent text-sm outline-none text-foreground placeholder-zinc-700 font-mono ${!item.enabled && 'opacity-50 text-textSecondary'
+                      }`}
                   />
                 )}
               </div>

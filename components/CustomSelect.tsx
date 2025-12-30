@@ -51,14 +51,14 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         <span className="truncate">
           {renderValue ? renderValue(value) : (selectedOption?.label || placeholder || value)}
         </span>
-        <ChevronDown 
-          size={14} 
-          className={`text-textSecondary transition-transform duration-200 ml-2 shrink-0 ${isOpen ? 'rotate-180' : ''}`} 
+        <ChevronDown
+          size={14}
+          className={`text-textSecondary transition-transform duration-200 ml-2 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isOpen && (
-        <div className={`absolute top-full left-0 mt-1 z-50 bg-surfaceHighlight border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 ${dropdownClassName}`}>
+        <div className={`absolute top-full left-0 mt-1 z-50 bg-surfaceHighlight rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95 ${dropdownClassName}`}>
           <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
             {options.map((option) => (
               <button
@@ -67,11 +67,10 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                   onChange(option.value);
                   setIsOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between mb-0.5 transition-colors ${
-                  option.value === value 
-                    ? 'bg-surfaceLight text-white' 
-                    : 'text-textSecondary hover:text-white hover:bg-surfaceLight/50'
-                }`}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between mb-0.5 transition-colors ${option.value === value
+                  ? 'bg-surfaceLight text-foreground font-bold'
+                  : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/50'
+                  }`}
               >
                 <span className={`truncate ${option.className || ''}`}>{option.label}</span>
                 {option.value === value && <Check size={14} className="text-primary shrink-0 ml-2" />}
