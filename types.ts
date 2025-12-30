@@ -45,6 +45,13 @@ export interface RequestAuth {
 
 export type BodyType = 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'graphql';
 
+export interface ExpectedResponse {
+  id: string;
+  statusCode: string;
+  description: string;
+  bodyContent?: string; // Sample response body
+}
+
 export interface ApiRequest {
   id: string;
   name: string;
@@ -63,7 +70,9 @@ export interface ApiRequest {
 
   auth: RequestAuth;
   useProxy: boolean;
+  summary?: string;
   description?: string;
+  expectedResponses?: ExpectedResponse[];
 }
 
 // Extends ApiRequest to include organization data

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ApiRequest, HttpMethod, KeyValueItem, AuthMethod } from '../types';
-import { Play, Save, Layers, Shield, FileJson, Link, Globe, Code, X, ArrowDownToLine } from 'lucide-react';
+import { Play, Save, Layers, Shield, FileJson, Link, Globe, Code, X, ArrowDownToLine, Info, Plus, Trash2 } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
 import AutocompleteInput from './AutocompleteInput';
 import CustomSelect from './CustomSelect';
@@ -22,6 +22,7 @@ interface RequestPanelProps {
 const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, onSend, onSave, loading, environmentVariables = [], isSavedRequest = false, addToast }) => {
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body'>('params');
   const [showCodeModal, setShowCodeModal] = useState(false);
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [codeLang, setCodeLang] = useState<'curl' | 'js' | 'python'>('curl');
 
   const handleMethodChange = (val: string) => {
@@ -136,6 +137,14 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
           </button>
 
           <button
+            onClick={() => setShowMetadataModal(true)}
+            className="px-3 bg-surfaceHighlight hover:bg-surfaceLight text-textSecondary hover:text-foreground rounded-lg transition-all"
+            title="Request Metadata"
+          >
+            <Info size={16} />
+          </button>
+
+          <button
             onClick={onSave}
             className="px-4 bg-surfaceHighlight hover:bg-surfaceLight text-foreground font-bold rounded-lg flex items-center gap-2 transition-all active:scale-95"
             title={isSavedRequest ? "Update Request" : "Save to Collection"}
@@ -221,6 +230,134 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
           )}
         </div>
       </div>
+
+      {/* Metadata Modal */}
+      {showMetadataModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-surface border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-surfaceLight/30">
+              <div className="flex items-center gap-2">
+                <Info size={18} className="text-primary" />
+                <h3 className="font-bold text-foreground">Request Metadata</h3>
+              </div>
+              <button onClick={() => setShowMetadataModal(false)} className="text-textSecondary hover:text-foreground"><X size={18} /></button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Request Name</label>
+                <input
+                  type="text"
+                  value={request.name}
+                  onChange={(e) => onRequestChange({ ...request, name: e.target.value })}
+                  className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  placeholder="e.g. Get User Profile"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Summary (Short)</label>
+                <input
+                  type="text"
+                  value={request.summary || ''}
+                  onChange={(e) => onRequestChange({ ...request, summary: e.target.value })}
+                  className="w-full bg-surfaceLight border border-border p-3 rounded-lg text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  placeholder="A brief summary of what this request does"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Description (Long)</label>
+                <textarea
+                  value={request.description || ''}
+                  onChange={(e) => onRequestChange({ ...request, description: e.target.value })}
+                  className="w-full h-32 bg-surfaceLight border border-border p-3 rounded-lg text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none"
+                  placeholder="Detailed explanation of the endpoint, parameters, and behaviors..."
+                />
+              </div>
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider">Expected Responses</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newResponses = [...(request.expectedResponses || [])];
+                      newResponses.push({ id: Math.random().toString(36).substr(2, 9), statusCode: '200', description: 'Success' });
+                      onRequestChange({ ...request, expectedResponses: newResponses });
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded text-[10px] font-bold uppercase transition-all"
+                  >
+                    <Plus size={12} />
+                    Add Response
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {(!request.expectedResponses || request.expectedResponses.length === 0) && (
+                    <p className="text-[11px] text-textSecondary italic text-center py-4 bg-surfaceLight/10 rounded-lg">No predefined responses. Add one to document this endpoint.</p>
+                  )}
+                  {request.expectedResponses?.map((res, index) => (
+                    <div key={res.id} className="p-3 bg-surfaceLight/20 rounded-lg border border-border/40 group mb-3 last:mb-0 shadow-sm transition-all hover:bg-surfaceLight/30">
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={res.statusCode}
+                          onChange={(e) => {
+                            const newRes = [...request.expectedResponses!];
+                            newRes[index] = { ...res, statusCode: e.target.value };
+                            onRequestChange({ ...request, expectedResponses: newRes });
+                          }}
+                          className="w-16 bg-surfaceLight border border-border px-2 py-1 rounded text-xs font-bold text-foreground focus:border-primary outline-none"
+                          placeholder="200"
+                        />
+                        <input
+                          type="text"
+                          value={res.description}
+                          onChange={(e) => {
+                            const newRes = [...request.expectedResponses!];
+                            newRes[index] = { ...res, description: e.target.value };
+                            onRequestChange({ ...request, expectedResponses: newRes });
+                          }}
+                          className="flex-1 bg-surfaceLight border border-border px-2 py-1 rounded text-xs text-foreground focus:border-primary outline-none"
+                          placeholder="Description"
+                        />
+                        <button
+                          onClick={() => {
+                            const newRes = request.expectedResponses!.filter((_, i) => i !== index);
+                            onRequestChange({ ...request, expectedResponses: newRes });
+                          }}
+                          className="p-1 text-textSecondary/40 hover:text-danger hover:bg-danger/10 rounded transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <textarea
+                        value={res.bodyContent || ''}
+                        onChange={(e) => {
+                          const newRes = [...request.expectedResponses!];
+                          newRes[index] = { ...res, bodyContent: e.target.value };
+                          onRequestChange({ ...request, expectedResponses: newRes });
+                        }}
+                        className="w-full h-20 bg-black/20 border border-border/50 p-2 rounded text-[10px] font-mono text-textSecondary focus:text-foreground focus:border-primary outline-none resize-none"
+                        placeholder="Sample JSON response body..."
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border bg-surface flex justify-end">
+              <button
+                onClick={() => setShowMetadataModal(false)}
+                className="px-6 py-2 bg-primary hover:bg-primaryHover text-white text-sm font-bold rounded-lg"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Code Generation Modal */}
       {showCodeModal && (

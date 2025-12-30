@@ -811,6 +811,7 @@ const App: React.FC = () => {
       })));
 
       setSavedRequests(reqs.map((r: any) => ({
+        ...(r.request || {}),
         ...r,
         id: String(r.id),
         workspaceId: newWs.id,
@@ -1346,6 +1347,7 @@ const App: React.FC = () => {
     const newTabId = isSavedRequest ? req.id.toString() : `tab_${Date.now()}`;
     const restoredRequest = {
       ...DEFAULT_REQUEST,
+      ...(req as any).request, // Flatten nested data if it exists
       ...req,
       id: newTabId,
       useProxy: req.useProxy ?? false
@@ -1447,30 +1449,30 @@ const App: React.FC = () => {
       {/* Sidebar */}
       <div className="w-72 bg-surface border-r border-border flex flex-col relative z-10">
         {/* Workspace Switcher Header */}
-        <div className="p-3 border-b border-border relative">
+        <div className="px-4 py-5 border-b border-white/5 relative bg-gradient-to-b from-white/[0.02] to-transparent">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-              className="flex-1 flex items-center justify-between p-1.5 rounded-lg hover:bg-surfaceLight/50 transition-colors group"
+              className="flex-1 flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.03] transition-all group border border-transparent hover:border-white/5"
             >
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-md bg-surfaceHighlight/50 flex items-center justify-center text-primary/80 shadow-sm border border-border/10">
-                  <Box size={14} />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-surfaceHighlight/30 flex items-center justify-center text-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] border border-white/5 group-hover:scale-105 transition-transform">
+                  <Box size={20} className="filter drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]" />
                 </div>
-                <div className="flex flex-col items-start leading-tight">
-                  <span className="text-[10px] text-textSecondary font-bold uppercase tracking-wider opacity-60">Workspace</span>
-                  <span className="text-[13px] font-bold text-foreground truncate max-w-[130px]">{activeWorkspace.name}</span>
+                <div className="flex flex-col items-start text-left">
+                  <span className="text-[9px] text-primary/60 font-black uppercase tracking-[0.2em] leading-none mb-1">Workspace</span>
+                  <span className="text-[14px] font-bold text-foreground/90 truncate max-w-[120px] leading-tight">{activeWorkspace.name}</span>
                 </div>
               </div>
-              <ChevronDown size={14} className={`text-textSecondary/50 transition-transform ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`text-textSecondary/30 transition-transform duration-300 ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
             </button>
             {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
               <button
                 onClick={() => setShowInviteModal(true)}
-                className="p-1.5 rounded-md text-textSecondary/60 hover:text-primary hover:bg-surfaceLight/50 transition-colors"
+                className="p-2.5 rounded-xl text-textSecondary/40 hover:text-primary hover:bg-primary/10 transition-all border border-transparent hover:border-primary/20 shadow-sm"
                 title="Invite a collaborator"
               >
-                <Mail size={14} />
+                <Mail size={16} />
               </button>
             )}
           </div>
@@ -1508,6 +1510,7 @@ const App: React.FC = () => {
                               })));
 
                               setSavedRequests(reqs.map((r: any) => ({
+                                ...(r.request || {}),
                                 ...r,
                                 id: String(r.id) || `req_${Date.now()}`,
                                 workspaceId: ws.id,
@@ -1599,6 +1602,7 @@ const App: React.FC = () => {
                                       })));
 
                                       setSavedRequests(reqs.map((r: any) => ({
+                                        ...(r.request || {}),
                                         ...r,
                                         id: String(r.id) || `req_${Date.now()}`,
                                         workspaceId: newActive.id,
@@ -1773,40 +1777,41 @@ const App: React.FC = () => {
         </div>
 
         {/* Sidebar View Switcher & Search */}
-        <div className="flex flex-col gap-2 px-3 py-2">
+        {/* Sidebar View Switcher & Search */}
+        <div className="flex flex-col gap-3 px-4 py-4">
           {/* View Switcher */}
-          <div className="flex gap-1 bg-surfaceHighlight/30 p-1 rounded-lg">
+          <div className="flex gap-1 bg-surfaceHighlight/20 p-1 rounded-xl border border-white/5">
             <button
               onClick={() => setSidebarView('collections')}
-              className={`flex-1 flex items-center justify-center py-1.5 rounded-md transition-all text-[11px] font-medium ${sidebarView === 'collections'
-                ? 'bg-surface shadow-sm text-primary'
-                : 'text-textSecondary hover:text-foreground hover:bg-white/5'
+              className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all text-[11px] font-bold tracking-tight ${sidebarView === 'collections'
+                ? 'bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.3)] text-primary border border-white/5'
+                : 'text-textSecondary/60 hover:text-foreground hover:bg-white/5'
                 }`}
             >
-              <Folder size={12} className="mr-1.5" />
+              <Folder size={12} className={`mr-2 transition-colors ${sidebarView === 'collections' ? 'text-primary' : ''}`} />
               Collections
             </button>
             <button
               onClick={() => setSidebarView('history')}
-              className={`flex-1 flex items-center justify-center py-1.5 rounded-md transition-all text-[11px] font-medium ${sidebarView === 'history'
-                ? 'bg-surface shadow-sm text-primary'
-                : 'text-textSecondary hover:text-foreground hover:bg-white/5'
+              className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all text-[11px] font-bold tracking-tight ${sidebarView === 'history'
+                ? 'bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.3)] text-primary border border-white/5'
+                : 'text-textSecondary/60 hover:text-foreground hover:bg-white/5'
                 }`}
             >
-              <Clock size={12} className="mr-1.5" />
+              <Clock size={12} className={`mr-2 transition-colors ${sidebarView === 'history' ? 'text-primary' : ''}`} />
               History
             </button>
           </div>
 
           {/* Search Bar */}
           <div className="relative group/search">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-textSecondary/50 group-focus-within/search:text-primary transition-colors" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary/40 group-focus-within/search:text-primary transition-colors" />
             <input
               type="text"
               placeholder="Filter..."
               value={sidebarSearchQuery}
               onChange={(e) => setSidebarSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-surfaceHighlight/20 hover:bg-surfaceHighlight/40 border border-transparent focus:border-primary/20 rounded-md text-[11px] text-foreground placeholder-textSecondary/40 outline-none transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-surfaceLight/30 border border-white/5 focus:border-primary/30 rounded-xl text-[12px] text-foreground placeholder-textSecondary/30 outline-none transition-all focus:bg-surfaceLight/50"
             />
           </div>
         </div>
@@ -1855,9 +1860,9 @@ const App: React.FC = () => {
               {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
                 <button
                   onClick={() => setShowCreateCollectionModal(true)}
-                  className="w-full flex items-center justify-center py-1.5 mb-1 bg-surfaceLight/20 hover:bg-primary/5 text-primary/60 hover:text-primary rounded-md border border-dashed border-border/40 hover:border-primary/30 transition-all font-medium text-[10px] uppercase tracking-wider"
+                  className="w-full flex items-center justify-center py-2 mb-2 bg-white/5 hover:bg-primary/5 text-primary/70 hover:text-primary rounded-xl border border-dashed border-white/10 hover:border-primary/30 transition-all font-bold text-[10px] uppercase tracking-[0.1em]"
                 >
-                  <Plus size={12} className="mr-1.5" />
+                  <Plus size={14} className="mr-2" />
                   New Collection
                 </button>
               )}
@@ -1871,9 +1876,9 @@ const App: React.FC = () => {
                 const colRequests = savedRequests.filter(r => r.collectionId === col.id);
 
                 return (
-                  <div key={col.id} className="group/col">
+                  <div key={col.id} className="group/col mb-1 last:mb-0">
                     <div
-                      className="flex items-center justify-between p-1 rounded-md hover:bg-surfaceLight/20 group/header transition-colors"
+                      className="flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.03] group/header transition-all border border-transparent hover:border-white/5"
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setCollectionContextMenu({ x: e.clientX, y: e.clientY, collectionId: col.id });
@@ -1881,45 +1886,47 @@ const App: React.FC = () => {
                     >
                       <button
                         onClick={() => toggleCollection(col.id)}
-                        className="flex items-center gap-2 flex-1 overflow-hidden"
+                        className="flex items-center gap-3 flex-1 overflow-hidden"
                       >
-                        <ChevronRight size={12} className={`text-textSecondary/50 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                        {isExpanded ? <FolderOpen size={14} className="text-primary/80" /> : <Folder size={14} className="text-primary/60" />}
-                        <span className="text-[13px] font-medium text-foreground/90 truncate">{col.name}</span>
+                        <ChevronRight size={12} className={`text-textSecondary/20 transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
+                        <div className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'bg-primary/10' : 'bg-surfaceHighlight/20'}`}>
+                          {isExpanded ? <FolderOpen size={14} className="text-primary" /> : <Folder size={14} className="text-textSecondary/60" />}
+                        </div>
+                        <span className={`text-[13px] font-semibold truncate transition-colors ${isExpanded ? 'text-foreground' : 'text-textSecondary/80 group-hover/header:text-foreground'}`}>{col.name}</span>
                       </button>
                       <button
                         onClick={() => deleteCollection(col.id)}
-                        className="opacity-0 group-hover/header:opacity-100 text-textSecondary/40 hover:text-danger transition-opacity p-1 rounded hover:bg-danger/10"
+                        className="opacity-0 group-hover/header:opacity-100 text-textSecondary/30 hover:text-danger transition-all p-1.5 rounded-lg hover:bg-danger/10"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
 
                     {isExpanded && (
-                      <div className="pl-3 border-l border-border/30 ml-2.5 my-0.5 space-y-0.5">
+                      <div className="pl-4 border-l border-white/5 ml-4.5 my-1 space-y-1">
                         {colRequests.length === 0 && (
-                          <div className="text-[10px] text-textSecondary/50 pl-4 py-1.5 italic">Empty collection</div>
+                          <div className="text-[10px] text-textSecondary/30 pl-4 py-3 italic">Empty collection</div>
                         )}
                         {colRequests.filter(req => req && req.id).map(req => (
                           <div key={req.id} className="flex items-center group/req">
                             <button
                               onClick={() => restoreRequest(req)}
-                              className={`flex-1 flex items-center gap-1.5 p-1 rounded-md hover:bg-surfaceLight/20 text-left overflow-hidden transition-all ${request.id === req.id ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
+                              className={`flex-1 flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] text-left overflow-hidden transition-all border border-transparent ${request.id === req.id ? 'bg-primary/5 border-primary/20 shadow-sm' : 'hover:border-white/5'}`}
                             >
-                              <span className={`text-[8px] font-bold w-7 text-center rounded py-0.5 ${req.method === 'GET' ? 'text-blue-400/80 bg-blue-400/5 border border-blue-400/10' :
-                                req.method === 'POST' ? 'text-emerald-400/80 bg-emerald-400/5 border border-emerald-400/10' :
-                                  req.method === 'DELETE' ? 'text-red-400/80 bg-red-400/5 border border-red-400/10' :
-                                    'text-indigo-400/80 bg-indigo-400/5 border border-indigo-400/10'
+                              <div className={`w-10 text-[9px] font-black tracking-tighter text-center rounded-lg py-1 border shadow-sm ${req.method === 'GET' ? 'text-blue-400 bg-blue-500/5 border-blue-500/10' :
+                                req.method === 'POST' ? 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10' :
+                                  req.method === 'DELETE' ? 'text-red-400 bg-red-500/5 border-red-500/10' :
+                                    'text-indigo-400 bg-indigo-500/5 border-indigo-500/10'
                                 }`}>
                                 {req.method}
-                              </span>
-                              <span className="text-[12px] text-textSecondary group-hover/req:text-foreground truncate font-medium">{req.name}</span>
+                              </div>
+                              <span className={`text-[12px] truncate font-bold transition-colors ${request.id === req.id ? 'text-primary' : 'text-textSecondary/80 group-hover/req:text-foreground'}`}>{req.name}</span>
                             </button>
                             <button
                               onClick={() => deleteSavedRequest(req.id)}
-                              className="opacity-0 group-hover/req:opacity-100 p-1 text-textSecondary/40 hover:text-danger rounded transition-opacity hover:bg-danger/10"
+                              className="opacity-0 group-hover/req:opacity-100 p-2 text-textSecondary/30 hover:text-danger rounded-xl transition-all hover:bg-danger/10"
                             >
-                              <Trash2 size={11} />
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         ))}
@@ -1934,37 +1941,37 @@ const App: React.FC = () => {
         </div>
 
         {/* User Footer */}
-        <div className="p-2 mx-3 mb-3 mt-auto bg-surfaceLight/10 rounded-lg hover:bg-surfaceLight/20 transition-all group">
+        <div className="mx-4 mb-4 mt-auto p-3 bg-surfaceHighlight/10 backdrop-blur-md rounded-2xl border border-white/5 transition-all group hover:bg-surfaceHighlight/20 hover:border-white/10 shadow-lg">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-7 h-7 rounded bg-primary/90 flex items-center justify-center text-[10px] font-bold text-white shadow-sm shrink-0">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-[11px] font-black text-white shadow-lg shrink-0">
                 {user.name.charAt(0)}
               </div>
               <div className="flex flex-col min-w-0 leading-tight">
-                <span className="text-[11px] font-bold text-foreground/90 truncate">{user.name}</span>
-                <span className="text-[9px] text-textSecondary/50 font-medium">Pro Plan</span>
+                <span className="text-[12px] font-bold text-foreground/90 truncate">{user.name}</span>
+                <span className="text-[10px] text-textSecondary/40 font-bold uppercase tracking-widest leading-none mt-0.5">Pro User</span>
               </div>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => {
                   if (user) fetchInvitations(user.email);
                   setShowInboxModal(true);
                 }}
-                className="text-textSecondary/40 hover:text-primary transition-colors p-1.5 hover:bg-primary/5 rounded relative"
+                className="text-textSecondary/30 hover:text-primary transition-all p-2 hover:bg-primary/10 rounded-lg relative group/icon"
                 title="View invitations"
               >
-                <Mail size={13} />
+                <Mail size={14} />
                 {invitations.length > 0 && (
-                  <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-danger rounded-full ring-1 ring-surface" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-danger rounded-full ring-2 ring-surface animate-pulse" />
                 )}
               </button>
               <button
                 onClick={handleLogout}
-                className="text-textSecondary/40 hover:text-danger p-1.5 transition-colors hover:bg-danger/5 rounded"
+                className="text-textSecondary/30 hover:text-danger p-2 transition-all hover:bg-danger/10 rounded-lg"
                 title="Logout"
               >
-                <LogOut size={13} />
+                <LogOut size={14} />
               </button>
             </div>
           </div>

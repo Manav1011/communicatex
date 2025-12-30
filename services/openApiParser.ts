@@ -39,7 +39,6 @@ export const parseOpenApi = async (url: string): Promise<OpenApiImportResult> =>
 export const parseOpenApiContent = (schema: any): OpenApiImportResult => {
     try {
         const title = schema.info?.title || 'Imported API';
-        // ... rest of logic
         const paths = schema.paths || {};
         const groups: { [key: string]: Partial<ApiRequest>[] } = {};
 
@@ -79,6 +78,7 @@ export const parseOpenApiContent = (schema: any): OpenApiImportResult => {
                         name: operation.summary || operation.operationId || `${method.toUpperCase()} ${path}`,
                         method: method.toUpperCase() as any,
                         url: path,
+                        summary: operation.summary || '',
                         description: operation.description || '',
                         headers: headerItems,
                         params: queryParams,
@@ -103,6 +103,22 @@ export const parseOpenApiContent = (schema: any): OpenApiImportResult => {
                                 request.bodyType = 'form-data';
                             }
                         }
+                    }
+
+                    // Handle Responses
+                    if (operation.responses) {
+                        request.expectedResponses = Object.entries(operation.responses).map(([code, res]: [string, any]) => {
+                            let sampleBody = '';
+                            if (res.content?.['application/json']?.schema) {
+                                sampleBody = JSON.stringify(generateSampleFromSchema(res.content['application/json'].schema, schema.components?.schemas), null, 2);
+                            }
+                            return {
+                                id: generateId(),
+                                statusCode: code,
+                                description: res.description || '',
+                                bodyContent: sampleBody
+                            };
+                        });
                     }
 
                     // Try to get base URL from servers

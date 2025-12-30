@@ -102,17 +102,39 @@ export const generateOpenApi = (
             }
         }
 
+        const responses: Record<string, any> = {};
+        if (req.expectedResponses && req.expectedResponses.length > 0) {
+            req.expectedResponses.forEach(res => {
+                const responseDef: any = {
+                    description: res.description || 'Successful Response',
+                };
+                if (res.bodyContent) {
+                    try {
+                        responseDef.content = {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    example: JSON.parse(res.bodyContent)
+                                }
+                            }
+                        };
+                    } catch {
+                        // ignore invalid JSON
+                    }
+                }
+                responses[res.statusCode] = responseDef;
+            });
+        } else {
+            responses['200'] = { description: 'Successful Response' };
+        }
+
         schema.paths[path][method] = {
-            summary: req.name,
+            summary: req.summary || req.name,
             description: req.description,
             tags: [getCollectionName(req.collectionId)],
             parameters,
             requestBody,
-            responses: {
-                '200': {
-                    description: 'Successful Response'
-                }
-            }
+            responses
         };
     });
 
