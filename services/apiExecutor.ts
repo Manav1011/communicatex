@@ -1,4 +1,4 @@
-import { ApiRequest, ApiResponse, AuthMethod, HttpMethod, KeyValueItem } from '../types';
+import { ApiRequest, ApiResponse, AuthMethod, HttpMethod, KeyValueItem, TestCase, TestResult } from '../types';
 
 /**
  * Replaces instances of <<variable>> with values from the environment.
@@ -16,6 +16,99 @@ import { API_BASE_URL } from './api';
 
 // Backend proxy server (see server.js). Keep port in sync with that file.
 const PROXY_URL = `${API_BASE_URL}/proxy`;
+
+/**
+ * Executes assertions against the response
+ */
+const runTests = (request: ApiRequest, response: ApiResponse): TestResult[] => {
+  if (!request.testCases || request.testCases.length === 0) return [];
+
+  return request.testCases.filter(tc => tc.enabled).map(tc => {
+    let passed = false;
+    let actualValue: any = undefined;
+    let message = '';
+
+    try {
+      switch (tc.type) {
+        case 'status_code':
+          actualValue = response.statusCode;
+          break;
+        case 'response_time':
+          actualValue = response.time;
+          break;
+        case 'header':
+          actualValue = tc.property ? response.headers[tc.property.toLowerCase()] : undefined;
+          break;
+        case 'json_body':
+          if (tc.property && response.data && typeof response.data === 'object') {
+            actualValue = getNestedValue(response.data, tc.property.replace(/^\$\.?/, ''));
+          }
+          break;
+        case 'text_body':
+          actualValue = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+          break;
+      }
+
+      const expectedValue = tc.value;
+
+      switch (tc.operator) {
+        case 'equals':
+          passed = String(actualValue) === String(expectedValue);
+          message = passed ? `Value matches expected "${expectedValue}"` : `Expected "${expectedValue}", got "${actualValue}"`;
+          break;
+        case 'not_equals':
+          passed = String(actualValue) !== String(expectedValue);
+          message = passed ? `Value correctly differs from "${expectedValue}"` : `Value unexpectedly matches "${expectedValue}"`;
+          break;
+        case 'contains':
+          passed = String(actualValue).includes(String(expectedValue));
+          message = passed ? `Value contains "${expectedValue}"` : `Value does not contain "${expectedValue}"`;
+          break;
+        case 'not_contains':
+          passed = !String(actualValue).includes(String(expectedValue));
+          message = passed ? `Value does not contain "${expectedValue}"` : `Value unexpectedly contains "${expectedValue}"`;
+          break;
+        case 'greater_than':
+          passed = Number(actualValue) > Number(expectedValue);
+          message = passed ? `${actualValue} is greater than ${expectedValue}` : `${actualValue} is not greater than ${expectedValue}`;
+          break;
+        case 'less_than':
+          passed = Number(actualValue) < Number(expectedValue);
+          message = passed ? `${actualValue} is less than ${expectedValue}` : `${actualValue} is not less than ${expectedValue}`;
+          break;
+        case 'exists':
+          passed = actualValue !== undefined && actualValue !== null;
+          message = passed ? 'Property exists' : 'Property does not exist';
+          break;
+        case 'not_exists':
+          passed = actualValue === undefined || actualValue === null;
+          message = passed ? 'Property does not exist' : 'Property exists but was expected to be absent';
+          break;
+      }
+    } catch (e) {
+      passed = false;
+      message = `Error during assertion: ${e instanceof Error ? e.message : String(e)}`;
+    }
+
+    return {
+      testCaseId: tc.id,
+      testCaseName: tc.name,
+      passed,
+      message,
+      actualValue
+    };
+  });
+};
+
+/**
+ * Simple helper to get values from nested objects using dot notation
+ */
+const getNestedValue = (obj: any, path: string): any => {
+  if (!path) return obj;
+  return path.split('.').reduce((prev, curr) => {
+    return prev ? prev[curr] : undefined;
+  }, obj);
+};
 
 export const executeRequest = async (request: ApiRequest, environmentVariables: KeyValueItem[] = []): Promise<ApiResponse> => {
   const startTime = performance.now();
@@ -178,6 +271,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
       }
 
       const proxyData: ApiResponse = await proxyRes.json();
+      proxyData.testResults = runTests(request, proxyData);
       return proxyData;
 
     } else {
@@ -206,7 +300,7 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
         data = await res.text();
       }
 
-      return {
+      const finalResponse: ApiResponse = {
         statusCode,
         statusText,
         time,
@@ -214,6 +308,9 @@ export const executeRequest = async (request: ApiRequest, environmentVariables: 
         headers: resHeaders,
         data
       };
+
+      finalResponse.testResults = runTests(request, finalResponse);
+      return finalResponse;
     }
 
   } catch (error: any) {

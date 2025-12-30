@@ -9,7 +9,7 @@ interface ResponsePanelProps {
 }
 
 const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToast }) => {
-  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'diff'>('body');
+  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'diff' | 'tests'>('body');
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [isExpanded, setIsExpanded] = useState(false);
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
@@ -287,6 +287,23 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
                 Diff
               </button>
             )}
+            {response.testResults && (
+              <button
+                onClick={() => setActiveTab('tests')}
+                className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'tests'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-textSecondary hover:text-foreground'
+                  }`}
+              >
+                Tests
+                <span className={`text-[10px] ml-1 px-1.5 rounded-full font-bold ${response.testResults.every(r => r.passed)
+                  ? 'bg-success/20 text-success'
+                  : 'bg-danger/20 text-danger'
+                  }`}>
+                  {response.testResults.filter(r => r.passed).length}/{response.testResults.length}
+                </span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 px-2">
@@ -463,6 +480,55 @@ const ResponsePanel: React.FC<ResponsePanelProps> = ({ response, loading, addToa
                   })()}
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'tests' && response.testResults && (
+            <div className="p-4 space-y-3">
+              {response.testResults.map((result, idx) => (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-xl border transition-all ${result.passed
+                      ? 'bg-success/5 border-success/10 shadow-sm'
+                      : 'bg-danger/5 border-danger/10 shadow-sm'
+                    }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 ${result.passed ? 'text-success' : 'text-danger'}`}>
+                      {result.passed ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h3 className="text-sm font-bold text-foreground">
+                          {result.testCaseName}
+                        </h3>
+                        {result.passed ? (
+                          <span className="text-[10px] font-bold text-success uppercase tracking-wider bg-success/10 px-2 py-0.5 rounded-full">Pass</span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-danger uppercase tracking-wider bg-danger/10 px-2 py-0.5 rounded-full">Fail</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-textSecondary font-medium leading-relaxed">
+                        {result.message}
+                      </p>
+                      {!result.passed && result.actualValue !== undefined && (
+                        <div className="mt-2 text-[11px] font-mono bg-black/20 p-2 rounded-lg border border-white/5 text-textSecondary overflow-x-auto">
+                          <span className="text-danger/60 mr-1">Actual:</span>
+                          {typeof result.actualValue === 'object' ? JSON.stringify(result.actualValue) : String(result.actualValue)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {response.testResults.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Bookmark size={48} className="text-textSecondary/20 mb-4" />
+                  <p className="text-sm font-medium text-foreground">No test results to show</p>
+                  <p className="text-xs text-textSecondary mt-1">Define assertions in the "Tests" tab of your request to see results here.</p>
+                </div>
+              )}
             </div>
           )}
         </div>

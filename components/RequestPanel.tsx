@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { ApiRequest, HttpMethod, KeyValueItem, AuthMethod } from '../types';
-import { Play, Save, Layers, Shield, FileJson, Link, Globe, Code, X, ArrowDownToLine, Info, Plus, Trash2 } from 'lucide-react';
+import { Play, Save, Layers, Shield, FileJson, Link, Globe, Code, X, ArrowDownToLine, Info, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
 import AutocompleteInput from './AutocompleteInput';
 import CustomSelect from './CustomSelect';
 import RequestAuth from './request/RequestAuth';
 import RequestBody from './request/RequestBody';
+import RequestTests from './request/RequestTests';
 import { generateCurl, generateJavascript, generatePython } from '../services/codeGenerator';
 
 interface RequestPanelProps {
@@ -20,7 +21,7 @@ interface RequestPanelProps {
 }
 
 const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, onSend, onSave, loading, environmentVariables = [], isSavedRequest = false, addToast }) => {
-  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body'>('params');
+  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests'>('params');
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [codeLang, setCodeLang] = useState<'curl' | 'js' | 'python'>('curl');
@@ -174,7 +175,8 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
           { id: 'params', label: 'Params', icon: Link },
           { id: 'headers', label: 'Headers', icon: Layers },
           { id: 'auth', label: 'Auth', icon: Shield },
-          { id: 'body', label: 'Body', icon: FileJson }
+          { id: 'body', label: 'Body', icon: FileJson },
+          { id: 'tests', label: 'Tests', icon: CheckCircle2 }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -188,6 +190,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
             {tab.label}
             {tab.id === 'params' && request.params && request.params.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
             {tab.id === 'headers' && request.headers && request.headers.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1"></span>}
+            {tab.id === 'tests' && request.testCases && request.testCases.filter(p => p.enabled).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-1 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>}
           </button>
         ))}
       </div>
@@ -226,6 +229,13 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onRequestChange, o
               request={request}
               onRequestChange={onRequestChange}
               environmentVariables={environmentVariables}
+            />
+          )}
+
+          {activeTab === 'tests' && (
+            <RequestTests
+              request={request}
+              onRequestChange={onRequestChange}
             />
           )}
         </div>

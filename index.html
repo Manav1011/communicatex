@@ -183,6 +183,15 @@
     ::placeholder {
       color: #52525b !important;
     }
+
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
   </style>
   <!-- Vite will load and transform this module; it mounts React into #root -->
   <script type="module" src="/index.tsx"></script>

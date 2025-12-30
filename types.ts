@@ -52,6 +52,27 @@ export interface ExpectedResponse {
   bodyContent?: string; // Sample response body
 }
 
+export type AssertionType = 'status_code' | 'response_time' | 'json_body' | 'header' | 'text_body';
+export type AssertionOperator = 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'exists' | 'not_exists';
+
+export interface TestCase {
+  id: string;
+  name: string;
+  type: AssertionType;
+  property?: string; // e.g., "Content-Type" for headers or "$.data.id" for JSON
+  operator: AssertionOperator;
+  value?: string;
+  enabled: boolean;
+}
+
+export interface TestResult {
+  testCaseId: string;
+  testCaseName: string;
+  passed: boolean;
+  message: string;
+  actualValue?: any;
+}
+
 export interface ApiRequest {
   id: string;
   name: string;
@@ -73,6 +94,7 @@ export interface ApiRequest {
   summary?: string;
   description?: string;
   expectedResponses?: ExpectedResponse[];
+  testCases?: TestCase[];
 }
 
 // Extends ApiRequest to include organization data
@@ -90,6 +112,7 @@ export interface ApiResponse {
   headers: Record<string, string>;
   data: any;
   error?: string;
+  testResults?: TestResult[];
 }
 
 export interface Workspace {

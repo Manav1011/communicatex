@@ -8,7 +8,7 @@ import ResponsePanel from './components/ResponsePanel';
 import KeyValueEditor from './components/KeyValueEditor';
 import CommandPalette from './components/CommandPalette';
 import { parseOpenApi } from './services/openApiParser';
-import { History, LogOut, Zap, LayoutGrid, Clock, ChevronDown, ChevronRight, Plus, Check, Box, Database, Trash2, Settings, Folder, Save, MoreVertical, FolderOpen, FileText, Mail, X, Copy, Edit, ExternalLink, Columns, Rows, Sun, Moon, SunDim, Search, Palette, Globe, Download } from 'lucide-react';
+import { History, LogOut, Zap, LayoutGrid, Clock, ChevronDown, ChevronRight, Plus, Check, Box, Database, Trash2, Settings, Folder, Save, MoreVertical, FolderOpen, FileText, Mail, X, Copy, Edit, ExternalLink, Columns, Rows, Sun, Moon, SunDim, Search, Palette, Globe, Download, PanelLeftOpen, PanelLeftClose, Bot } from 'lucide-react';
 import { saveResponseToDB, getResponseFromDB, deleteResponseFromDB } from './services/storage';
 import { generateOpenApi } from './services/openApiGenerator';
 
@@ -26,7 +26,8 @@ const DEFAULT_REQUEST: ApiRequest = {
   graphqlQuery: '',
   graphqlVariables: '{\n\t\n}',
   auth: { type: AuthMethod.NONE },
-  useProxy: true
+  useProxy: true,
+  testCases: []
 };
 
 const DEFAULT_WORKSPACE: Workspace = {
@@ -105,6 +106,9 @@ const App: React.FC = () => {
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [brightness, setBrightness] = useState(100);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiPanelWidth, setAiPanelWidth] = useState(380);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Filtering & Dirty State Logic
@@ -783,6 +787,31 @@ const App: React.FC = () => {
       setWorkspaces(prev => [...prev, newWs]);
       setActiveWorkspaceId(newWs.id);
 
+      // 2.5. Create Default Environment if baseUrl exists
+      if (result.baseUrl) {
+        try {
+          const env = await apiService.saveEnvironment({
+            workspaceId: workspace.id,
+            name: 'Production',
+            variables: [{
+              id: 'var_' + Math.random().toString(36).substr(2, 9),
+              key: 'baseUrl',
+              value: result.baseUrl,
+              enabled: true
+            }]
+          });
+          const newEnv: Environment = {
+            id: `env_${env.id}`,
+            name: env.name,
+            variables: env.variables,
+          };
+          setEnvironments(prev => [...prev, newEnv]);
+          setActiveEnvId(newEnv.id);
+        } catch (e) {
+          console.warn('Failed to create default environment:', e);
+        }
+      }
+
       // 3. Create Collections and Requests
       for (const group of result.groups) {
         const collection = await apiService.createCollection(workspace.id, group.tag);
@@ -1447,532 +1476,534 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
       {/* Sidebar */}
-      <div className="w-72 bg-surface border-r border-border flex flex-col relative z-10">
-        {/* Workspace Switcher Header */}
-        <div className="px-4 py-5 border-b border-white/5 relative bg-gradient-to-b from-white/[0.02] to-transparent">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-              className="flex-1 flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.03] transition-all group border border-transparent hover:border-white/5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-surfaceHighlight/30 flex items-center justify-center text-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] border border-white/5 group-hover:scale-105 transition-transform">
-                  <Box size={20} className="filter drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]" />
-                </div>
-                <div className="flex flex-col items-start text-left">
-                  <span className="text-[9px] text-primary/60 font-black uppercase tracking-[0.2em] leading-none mb-1">Workspace</span>
-                  <span className="text-[14px] font-bold text-foreground/90 truncate max-w-[120px] leading-tight">{activeWorkspace.name}</span>
-                </div>
-              </div>
-              <ChevronDown size={14} className={`text-textSecondary/30 transition-transform duration-300 ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
-            </button>
-            {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+      <div className={`flex flex-col relative z-20 transition-all duration-300 ease-in-out border-r border-white/5 bg-surface overflow-hidden ${showSidebar ? 'w-[280px]' : 'w-0 border-none pointer-events-none'}`}>
+        <div className={`flex flex-col h-full w-[280px] transition-opacity duration-200 ${showSidebar ? 'opacity-100' : 'opacity-0'}`}>
+          {/* Workspace Switcher Header */}
+          <div className="px-4 py-5 border-b border-white/5 relative bg-gradient-to-b from-white/[0.02] to-transparent">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowInviteModal(true)}
-                className="p-2.5 rounded-xl text-textSecondary/40 hover:text-primary hover:bg-primary/10 transition-all border border-transparent hover:border-primary/20 shadow-sm"
-                title="Invite a collaborator"
+                onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
+                className="flex-1 flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.03] transition-all group border border-transparent hover:border-white/5"
               >
-                <Mail size={16} />
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-surfaceHighlight/30 flex items-center justify-center text-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] border border-white/5 group-hover:scale-105 transition-transform">
+                    <Box size={20} className="filter drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]" />
+                  </div>
+                  <div className="flex flex-col items-start text-left">
+                    <span className="text-[9px] text-primary/60 font-black uppercase tracking-[0.2em] leading-none mb-1">Workspace</span>
+                    <span className="text-[14px] font-bold text-foreground/90 truncate max-w-[120px] leading-tight">{activeWorkspace.name}</span>
+                  </div>
+                </div>
+                <ChevronDown size={14} className={`text-textSecondary/30 transition-transform duration-300 ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
               </button>
+              {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="p-2.5 rounded-xl text-textSecondary/40 hover:text-primary hover:bg-primary/10 transition-all border border-transparent hover:border-primary/20 shadow-sm"
+                  title="Invite a collaborator"
+                >
+                  <Mail size={16} />
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown Menu */}
+            {showWorkspaceMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowWorkspaceMenu(false)}></div>
+                <div className="absolute top-full left-4 right-4 mt-2 bg-surfaceHighlight rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <div className="p-2 max-h-48 overflow-y-auto">
+                    {workspaces.map(ws => (
+                      <div
+                        key={ws.id}
+                        className={`group flex items-center gap-2 p-2.5 rounded-lg mb-1 transition-colors ${activeWorkspaceId === ws.id ? 'bg-surfaceLight' : 'hover:bg-surfaceLight/50'}`}
+                      >
+                        <button
+                          onClick={async () => {
+                            setActiveWorkspaceId(ws.id);
+                            setShowWorkspaceMenu(false);
+                            // Load workspace data from backend
+                            if (ws.backendId && user?.backendId) {
+                              try {
+                                const [cols, reqs, envs, hist] = await Promise.all([
+                                  apiService.getCollections(ws.backendId),
+                                  apiService.getSavedRequests(ws.backendId),
+                                  apiService.getEnvironments(ws.backendId),
+                                  apiService.getHistory(ws.backendId),
+                                ]);
+
+                                setCollections(cols.map((c: any) => ({
+                                  id: `col_${c.id}`,
+                                  workspaceId: ws.id,
+                                  name: c.name,
+                                  createdAt: c.createdAt,
+                                })));
+
+                                setSavedRequests(reqs.map((r: any) => ({
+                                  ...(r.request || {}),
+                                  ...r,
+                                  id: String(r.id) || `req_${Date.now()}`,
+                                  workspaceId: ws.id,
+                                  collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
+                                })));
+
+                                setEnvironments(envs.map((e: any) => ({
+                                  id: `env_${e.id}`,
+                                  name: e.name,
+                                  variables: e.variables || [],
+                                })));
+
+                                setHistory(hist.map((h: any) => ({
+                                  ...h,
+                                  id: h.id || `hist_${Date.now()}`,
+                                  workspaceId: ws.id,
+                                })));
+
+                                // Load preferences to set active env
+                                const prefs = await apiService.getPreferences(user.backendId);
+                                if (prefs.activeEnvId) {
+                                  const prefEnv = envs.find((e: any) => e.id === prefs.activeEnvId);
+                                  if (prefEnv) {
+                                    setActiveEnvId(`env_${prefEnv.id}`);
+                                  }
+                                }
+                              } catch (err) {
+                                console.error('Failed to load workspace data:', err);
+                              }
+                            } else {
+                              // Default workspace - clear backend data
+                              setCollections([]);
+                              setSavedRequests([]);
+                              setEnvironments([]);
+                              setHistory([]);
+                              setActiveEnvId(null);
+                            }
+                          }}
+                          className={`flex-1 flex items-center justify-between px-2 py-1.5 rounded-lg text-sm transition-all ${activeWorkspaceId === ws.id
+                            ? 'text-white font-medium'
+                            : 'text-textSecondary hover:text-foreground'
+                            }`}
+                        >
+                          <span>{ws.name}</span>
+                          {activeWorkspaceId === ws.id && <Check size={14} className="text-primary" />}
+                        </button>
+                        {ws.id !== DEFAULT_WORKSPACE.id && ws.backendId && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm(`Are you sure you want to delete "${ws.name}"? This will permanently delete all collections, requests, environments, and history in this workspace.`)) {
+                                return;
+                              }
+
+                              if (!user?.backendId) return;
+
+                              try {
+                                const res = await fetch(`${API_BASE_URL}/workspaces/${ws.backendId}`, {
+                                  method: 'DELETE',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ userId: user.backendId }),
+                                });
+
+                                const data = await res.json();
+                                if (res.ok && data.success) {
+                                  // Remove from workspaces list
+                                  const updatedWorkspaces = workspaces.filter(w => w.id !== ws.id);
+                                  setWorkspaces(updatedWorkspaces);
+
+                                  // If deleted workspace was active, switch to default or first available
+                                  if (activeWorkspaceId === ws.id) {
+                                    const newActive = updatedWorkspaces.find(w => w.id === DEFAULT_WORKSPACE.id) || updatedWorkspaces[0];
+                                    if (newActive) {
+                                      setActiveWorkspaceId(newActive.id);
+                                      // Load data for new active workspace
+                                      if (newActive.backendId && user.backendId) {
+                                        const [cols, reqs, envs, hist] = await Promise.all([
+                                          apiService.getCollections(newActive.backendId),
+                                          apiService.getSavedRequests(newActive.backendId),
+                                          apiService.getEnvironments(newActive.backendId),
+                                          apiService.getHistory(newActive.backendId),
+                                        ]);
+
+                                        setCollections(cols.map((c: any) => ({
+                                          id: `col_${c.id}`,
+                                          workspaceId: newActive.id,
+                                          name: c.name,
+                                          createdAt: c.createdAt,
+                                        })));
+
+                                        setSavedRequests(reqs.map((r: any) => ({
+                                          ...(r.request || {}),
+                                          ...r,
+                                          id: String(r.id) || `req_${Date.now()}`,
+                                          workspaceId: newActive.id,
+                                          collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
+                                        })));
+
+                                        setEnvironments(envs.map((e: any) => ({
+                                          id: `env_${e.id}`,
+                                          name: e.name,
+                                          variables: e.variables || [],
+                                        })));
+
+                                        setHistory(hist.map((h: any) => ({
+                                          ...h,
+                                          id: h.id || `hist_${Date.now()}`,
+                                          workspaceId: newActive.id,
+                                        })));
+                                      } else {
+                                        setCollections([]);
+                                        setSavedRequests([]);
+                                        setEnvironments([]);
+                                        setHistory([]);
+                                        setActiveEnvId(null);
+                                      }
+                                    }
+                                  }
+
+                                  setShowWorkspaceMenu(false);
+                                } else {
+                                  alert(data?.error || 'Failed to delete workspace');
+                                }
+                              } catch (err) {
+                                console.error('Delete workspace error:', err);
+                                alert('Unable to delete workspace');
+                              }
+                            }}
+                            className="opacity-0 group-hover:opacity-100 text-textSecondary hover:text-danger transition-opacity p-1.5 rounded hover:bg-surfaceLight/30"
+                            title="Delete workspace"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-3 bg-surfaceLight/10">
+                    <button
+                      onClick={() => {
+                        setShowCreateWorkspaceModal(true);
+                        setShowWorkspaceMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Plus size={14} />
+                      <span>New Workspace</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowImportOpenApiModal(true);
+                        setShowWorkspaceMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-emerald-400 hover:bg-emerald-400/10 transition-colors mt-1"
+                    >
+                      <Globe size={14} />
+                      <span>Import OpenAPI</span>
+                    </button>
+                    <button
+                      onClick={handleExportOpenApi}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-400 hover:bg-blue-400/10 transition-colors mt-1"
+                    >
+                      <Download size={14} />
+                      <span>Export OpenAPI</span>
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
-          {/* Dropdown Menu */}
-          {showWorkspaceMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowWorkspaceMenu(false)}></div>
-              <div className="absolute top-full left-4 right-4 mt-2 bg-surfaceHighlight rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="p-2 max-h-48 overflow-y-auto">
-                  {workspaces.map(ws => (
-                    <div
-                      key={ws.id}
-                      className={`group flex items-center gap-2 p-2.5 rounded-lg mb-1 transition-colors ${activeWorkspaceId === ws.id ? 'bg-surfaceLight' : 'hover:bg-surfaceLight/50'}`}
-                    >
-                      <button
-                        onClick={async () => {
-                          setActiveWorkspaceId(ws.id);
-                          setShowWorkspaceMenu(false);
-                          // Load workspace data from backend
-                          if (ws.backendId && user?.backendId) {
-                            try {
-                              const [cols, reqs, envs, hist] = await Promise.all([
-                                apiService.getCollections(ws.backendId),
-                                apiService.getSavedRequests(ws.backendId),
-                                apiService.getEnvironments(ws.backendId),
-                                apiService.getHistory(ws.backendId),
-                              ]);
+          {/* Environment Section - Collapsible */}
+          <div className="bg-surface/50 mt-2">
+            <div className="w-full flex items-center justify-between px-3 py-2 hover:bg-surfaceLight/30 transition-colors group">
+              <button
+                onClick={() => setIsEnvExpanded(!isEnvExpanded)}
+                className="flex-1 flex items-center gap-2 text-left"
+              >
+                <ChevronRight size={12} className={`text-textSecondary/50 transition-transform ${isEnvExpanded ? 'rotate-90' : ''}`} />
+                <Database size={12} className={activeEnvId ? "text-primary/80" : "text-textSecondary/60"} />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-textSecondary/80">Environment</span>
+                {activeEnvId && (
+                  <span className="text-[10px] text-primary/80 font-medium truncate max-w-[80px]">
+                    ({environments.find(e => e.id === activeEnvId)?.name || 'Active'})
+                  </span>
+                )}
+              </button>
+              {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCreateEnvironment();
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-textSecondary hover:text-primary transition-opacity rounded hover:bg-surfaceLight/30"
+                  title="New Environment"
+                >
+                  <Plus size={12} />
+                </button>
+              )}
+            </div>
 
-                              setCollections(cols.map((c: any) => ({
-                                id: `col_${c.id}`,
-                                workspaceId: ws.id,
-                                name: c.name,
-                                createdAt: c.createdAt,
-                              })));
-
-                              setSavedRequests(reqs.map((r: any) => ({
-                                ...(r.request || {}),
-                                ...r,
-                                id: String(r.id) || `req_${Date.now()}`,
-                                workspaceId: ws.id,
-                                collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
-                              })));
-
-                              setEnvironments(envs.map((e: any) => ({
-                                id: `env_${e.id}`,
-                                name: e.name,
-                                variables: e.variables || [],
-                              })));
-
-                              setHistory(hist.map((h: any) => ({
-                                ...h,
-                                id: h.id || `hist_${Date.now()}`,
-                                workspaceId: ws.id,
-                              })));
-
-                              // Load preferences to set active env
-                              const prefs = await apiService.getPreferences(user.backendId);
-                              if (prefs.activeEnvId) {
-                                const prefEnv = envs.find((e: any) => e.id === prefs.activeEnvId);
-                                if (prefEnv) {
-                                  setActiveEnvId(`env_${prefEnv.id}`);
-                                }
-                              }
-                            } catch (err) {
-                              console.error('Failed to load workspace data:', err);
-                            }
-                          } else {
-                            // Default workspace - clear backend data
-                            setCollections([]);
-                            setSavedRequests([]);
-                            setEnvironments([]);
-                            setHistory([]);
-                            setActiveEnvId(null);
-                          }
-                        }}
-                        className={`flex-1 flex items-center justify-between px-2 py-1.5 rounded-lg text-sm transition-all ${activeWorkspaceId === ws.id
-                          ? 'text-white font-medium'
-                          : 'text-textSecondary hover:text-foreground'
-                          }`}
-                      >
-                        <span>{ws.name}</span>
-                        {activeWorkspaceId === ws.id && <Check size={14} className="text-primary" />}
-                      </button>
-                      {ws.id !== DEFAULT_WORKSPACE.id && ws.backendId && (
+            {isEnvExpanded && (
+              <div className="px-3 pb-2 space-y-1">
+                <button
+                  onClick={() => { setActiveEnvId(null); addToast('Switched to no environment', 'info'); }}
+                  className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all ${!activeEnvId
+                    ? 'bg-surfaceHighlight text-foreground shadow-sm'
+                    : 'text-textSecondary/70 hover:text-foreground hover:bg-surfaceLight/20'
+                    }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Database size={11} className={!activeEnvId ? "text-primary/70" : "text-textSecondary/40"} />
+                    <span className="font-medium">No Environment</span>
+                  </span>
+                  {!activeEnvId && <Check size={11} className="text-primary" />}
+                </button>
+                {environments.map(env => (
+                  <div
+                    key={env.id}
+                    onClick={() => { setActiveEnvId(env.id); addToast(`Switched to environment: ${env.name}`, 'info'); }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all group cursor-pointer ${activeEnvId === env.id
+                      ? 'bg-surfaceLight/80 text-foreground shadow-sm'
+                      : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/30'
+                      }`}
+                  >
+                    <span className="flex items-center gap-2.5 truncate">
+                      <Database size={13} className={activeEnvId === env.id ? "text-primary" : "text-textSecondary"} />
+                      <span className="font-medium truncate">{env.name}</span>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {activeEnvId === env.id && <Check size={13} className="text-primary" />}
+                      {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
                         <button
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            if (!confirm(`Are you sure you want to delete "${ws.name}"? This will permanently delete all collections, requests, environments, and history in this workspace.`)) {
-                              return;
-                            }
-
-                            if (!user?.backendId) return;
-
-                            try {
-                              const res = await fetch(`${API_BASE_URL}/workspaces/${ws.backendId}`, {
-                                method: 'DELETE',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId: user.backendId }),
-                              });
-
-                              const data = await res.json();
-                              if (res.ok && data.success) {
-                                // Remove from workspaces list
-                                const updatedWorkspaces = workspaces.filter(w => w.id !== ws.id);
-                                setWorkspaces(updatedWorkspaces);
-
-                                // If deleted workspace was active, switch to default or first available
-                                if (activeWorkspaceId === ws.id) {
-                                  const newActive = updatedWorkspaces.find(w => w.id === DEFAULT_WORKSPACE.id) || updatedWorkspaces[0];
-                                  if (newActive) {
-                                    setActiveWorkspaceId(newActive.id);
-                                    // Load data for new active workspace
-                                    if (newActive.backendId && user.backendId) {
-                                      const [cols, reqs, envs, hist] = await Promise.all([
-                                        apiService.getCollections(newActive.backendId),
-                                        apiService.getSavedRequests(newActive.backendId),
-                                        apiService.getEnvironments(newActive.backendId),
-                                        apiService.getHistory(newActive.backendId),
-                                      ]);
-
-                                      setCollections(cols.map((c: any) => ({
-                                        id: `col_${c.id}`,
-                                        workspaceId: newActive.id,
-                                        name: c.name,
-                                        createdAt: c.createdAt,
-                                      })));
-
-                                      setSavedRequests(reqs.map((r: any) => ({
-                                        ...(r.request || {}),
-                                        ...r,
-                                        id: String(r.id) || `req_${Date.now()}`,
-                                        workspaceId: newActive.id,
-                                        collectionId: r.collectionId ? `col_${r.collectionId}` : undefined,
-                                      })));
-
-                                      setEnvironments(envs.map((e: any) => ({
-                                        id: `env_${e.id}`,
-                                        name: e.name,
-                                        variables: e.variables || [],
-                                      })));
-
-                                      setHistory(hist.map((h: any) => ({
-                                        ...h,
-                                        id: h.id || `hist_${Date.now()}`,
-                                        workspaceId: newActive.id,
-                                      })));
-                                    } else {
-                                      setCollections([]);
-                                      setSavedRequests([]);
-                                      setEnvironments([]);
-                                      setHistory([]);
-                                      setActiveEnvId(null);
-                                    }
-                                  }
-                                }
-
-                                setShowWorkspaceMenu(false);
-                              } else {
-                                alert(data?.error || 'Failed to delete workspace');
-                              }
-                            } catch (err) {
-                              console.error('Delete workspace error:', err);
-                              alert('Unable to delete workspace');
-                            }
+                            setEditingEnvId(env.id);
+                            setShowEnvModal(true);
                           }}
-                          className="opacity-0 group-hover:opacity-100 text-textSecondary hover:text-danger transition-opacity p-1.5 rounded hover:bg-surfaceLight/30"
-                          title="Delete workspace"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-textSecondary hover:text-primary transition-opacity rounded hover:bg-surfaceLight/30"
+                          title="Edit environment"
                         >
-                          <Trash2 size={12} />
+                          <Settings size={11} />
                         </button>
                       )}
                     </div>
-                  ))}
-                </div>
-                <div className="p-3 bg-surfaceLight/10">
+                  </div>
+                ))}
+                {environments.length === 0 && activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+                  <div className="text-[10px] text-textSecondary px-3 py-2 italic text-center">
+                    No environments. Create one to manage variables.
+                  </div>
+                )}
+                {activeWorkspaceId !== DEFAULT_WORKSPACE.id && environments.length > 0 && (
                   <button
-                    onClick={() => {
-                      setShowCreateWorkspaceModal(true);
-                      setShowWorkspaceMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+                    onClick={() => setShowEnvModal(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2 mt-2 text-[10px] font-bold uppercase tracking-widest text-textSecondary hover:text-primary hover:bg-surfaceLight/50 rounded-lg transition-all"
                   >
-                    <Plus size={14} />
-                    <span>New Workspace</span>
+                    <Settings size={11} />
+                    Manage Environments
                   </button>
-                  <button
-                    onClick={() => {
-                      setShowImportOpenApiModal(true);
-                      setShowWorkspaceMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-emerald-400 hover:bg-emerald-400/10 transition-colors mt-1"
-                  >
-                    <Globe size={14} />
-                    <span>Import OpenAPI</span>
-                  </button>
-                  <button
-                    onClick={handleExportOpenApi}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-400 hover:bg-blue-400/10 transition-colors mt-1"
-                  >
-                    <Download size={14} />
-                    <span>Export OpenAPI</span>
-                  </button>
-                </div>
+                )}
               </div>
-            </>
-          )}
-        </div>
-
-        {/* Environment Section - Collapsible */}
-        <div className="bg-surface/50 mt-2">
-          <div className="w-full flex items-center justify-between px-3 py-2 hover:bg-surfaceLight/30 transition-colors group">
-            <button
-              onClick={() => setIsEnvExpanded(!isEnvExpanded)}
-              className="flex-1 flex items-center gap-2 text-left"
-            >
-              <ChevronRight size={12} className={`text-textSecondary/50 transition-transform ${isEnvExpanded ? 'rotate-90' : ''}`} />
-              <Database size={12} className={activeEnvId ? "text-primary/80" : "text-textSecondary/60"} />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-textSecondary/80">Environment</span>
-              {activeEnvId && (
-                <span className="text-[10px] text-primary/80 font-medium truncate max-w-[80px]">
-                  ({environments.find(e => e.id === activeEnvId)?.name || 'Active'})
-                </span>
-              )}
-            </button>
-            {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCreateEnvironment();
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1 text-textSecondary hover:text-primary transition-opacity rounded hover:bg-surfaceLight/30"
-                title="New Environment"
-              >
-                <Plus size={12} />
-              </button>
             )}
           </div>
 
-          {isEnvExpanded && (
-            <div className="px-3 pb-2 space-y-1">
+          {/* Sidebar View Switcher & Search */}
+          {/* Sidebar View Switcher & Search */}
+          <div className="flex flex-col gap-3 px-4 py-4">
+            {/* View Switcher */}
+            <div className="flex gap-1 bg-surfaceHighlight/20 p-1 rounded-xl border border-white/5">
               <button
-                onClick={() => { setActiveEnvId(null); addToast('Switched to no environment', 'info'); }}
-                className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all ${!activeEnvId
-                  ? 'bg-surfaceHighlight text-foreground shadow-sm'
-                  : 'text-textSecondary/70 hover:text-foreground hover:bg-surfaceLight/20'
+                onClick={() => setSidebarView('collections')}
+                className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all text-[11px] font-bold tracking-tight ${sidebarView === 'collections'
+                  ? 'bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.3)] text-primary border border-white/5'
+                  : 'text-textSecondary/60 hover:text-foreground hover:bg-white/5'
                   }`}
               >
-                <span className="flex items-center gap-2">
-                  <Database size={11} className={!activeEnvId ? "text-primary/70" : "text-textSecondary/40"} />
-                  <span className="font-medium">No Environment</span>
-                </span>
-                {!activeEnvId && <Check size={11} className="text-primary" />}
+                <Folder size={12} className={`mr-2 transition-colors ${sidebarView === 'collections' ? 'text-primary' : ''}`} />
+                Collections
               </button>
-              {environments.map(env => (
-                <div
-                  key={env.id}
-                  onClick={() => { setActiveEnvId(env.id); addToast(`Switched to environment: ${env.name}`, 'info'); }}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all group cursor-pointer ${activeEnvId === env.id
-                    ? 'bg-surfaceLight/80 text-foreground shadow-sm'
-                    : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/30'
-                    }`}
-                >
-                  <span className="flex items-center gap-2.5 truncate">
-                    <Database size={13} className={activeEnvId === env.id ? "text-primary" : "text-textSecondary"} />
-                    <span className="font-medium truncate">{env.name}</span>
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {activeEnvId === env.id && <Check size={13} className="text-primary" />}
-                    {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingEnvId(env.id);
-                          setShowEnvModal(true);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-textSecondary hover:text-primary transition-opacity rounded hover:bg-surfaceLight/30"
-                        title="Edit environment"
-                      >
-                        <Settings size={11} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {environments.length === 0 && activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
-                <div className="text-[10px] text-textSecondary px-3 py-2 italic text-center">
-                  No environments. Create one to manage variables.
-                </div>
-              )}
-              {activeWorkspaceId !== DEFAULT_WORKSPACE.id && environments.length > 0 && (
-                <button
-                  onClick={() => setShowEnvModal(true)}
-                  className="w-full flex items-center justify-center gap-2 py-2 mt-2 text-[10px] font-bold uppercase tracking-widest text-textSecondary hover:text-primary hover:bg-surfaceLight/50 rounded-lg transition-all"
-                >
-                  <Settings size={11} />
-                  Manage Environments
-                </button>
-              )}
+              <button
+                onClick={() => setSidebarView('history')}
+                className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all text-[11px] font-bold tracking-tight ${sidebarView === 'history'
+                  ? 'bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.3)] text-primary border border-white/5'
+                  : 'text-textSecondary/60 hover:text-foreground hover:bg-white/5'
+                  }`}
+              >
+                <Clock size={12} className={`mr-2 transition-colors ${sidebarView === 'history' ? 'text-primary' : ''}`} />
+                History
+              </button>
             </div>
-          )}
-        </div>
 
-        {/* Sidebar View Switcher & Search */}
-        {/* Sidebar View Switcher & Search */}
-        <div className="flex flex-col gap-3 px-4 py-4">
-          {/* View Switcher */}
-          <div className="flex gap-1 bg-surfaceHighlight/20 p-1 rounded-xl border border-white/5">
-            <button
-              onClick={() => setSidebarView('collections')}
-              className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all text-[11px] font-bold tracking-tight ${sidebarView === 'collections'
-                ? 'bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.3)] text-primary border border-white/5'
-                : 'text-textSecondary/60 hover:text-foreground hover:bg-white/5'
-                }`}
-            >
-              <Folder size={12} className={`mr-2 transition-colors ${sidebarView === 'collections' ? 'text-primary' : ''}`} />
-              Collections
-            </button>
-            <button
-              onClick={() => setSidebarView('history')}
-              className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all text-[11px] font-bold tracking-tight ${sidebarView === 'history'
-                ? 'bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.3)] text-primary border border-white/5'
-                : 'text-textSecondary/60 hover:text-foreground hover:bg-white/5'
-                }`}
-            >
-              <Clock size={12} className={`mr-2 transition-colors ${sidebarView === 'history' ? 'text-primary' : ''}`} />
-              History
-            </button>
+            {/* Search Bar */}
+            <div className="relative group/search">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary/40 group-focus-within/search:text-primary transition-colors" />
+              <input
+                type="text"
+                placeholder="Filter..."
+                value={sidebarSearchQuery}
+                onChange={(e) => setSidebarSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-surfaceLight/30 border border-white/5 focus:border-primary/30 rounded-xl text-[12px] text-foreground placeholder-textSecondary/30 outline-none transition-all focus:bg-surfaceLight/50"
+              />
+            </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="relative group/search">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary/40 group-focus-within/search:text-primary transition-colors" />
-            <input
-              type="text"
-              placeholder="Filter..."
-              value={sidebarSearchQuery}
-              onChange={(e) => setSidebarSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-surfaceLight/30 border border-white/5 focus:border-primary/30 rounded-xl text-[12px] text-foreground placeholder-textSecondary/30 outline-none transition-all focus:bg-surfaceLight/50"
-            />
-          </div>
-        </div>
+          {/* Sidebar Content */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
 
-        {/* Sidebar Content */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
-
-          {/* HISTORY VIEW */}
-          {sidebarView === 'history' && (
-            <ul className="space-y-2">
-              {filteredHistory.map((item) => (
-                <li key={item.id}>
-                  <button
-                    onClick={() => restoreRequest(item.request)}
-                    className="w-full text-left p-2 rounded-lg hover:bg-surfaceLight/50 border border-transparent hover:border-border transition-all group relative overflow-hidden"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.request.method === 'GET' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
-                        item.request.method === 'POST' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                          item.request.method === 'DELETE' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
-                            'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
-                        }`}>
-                        {item.request.method}
-                      </span>
-                      <span className={`text-[10px] font-mono font-semibold ${item.responseStatus && item.responseStatus >= 400 ? 'text-danger' : 'text-success'}`}>
-                        {item.responseStatus || '...'}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-textSecondary truncate font-medium group-hover:text-foreground transition-colors">
-                      {item.request.url.replace(/^https?:\/\//, '')}
-                    </div>
-                  </button>
-                </li>
-              ))}
-              {filteredHistory.length === 0 && (
-                <li className="p-4 text-center border border-border rounded-lg bg-surfaceLight/5">
-                  <p className="text-xs text-textSecondary">No history in this workspace.</p>
-                </li>
-              )}
-            </ul>
-          )}
-
-          {/* COLLECTIONS VIEW */}
-          {sidebarView === 'collections' && (
-            <div className="space-y-3">
-              {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
-                <button
-                  onClick={() => setShowCreateCollectionModal(true)}
-                  className="w-full flex items-center justify-center py-2 mb-2 bg-white/5 hover:bg-primary/5 text-primary/70 hover:text-primary rounded-xl border border-dashed border-white/10 hover:border-primary/30 transition-all font-bold text-[10px] uppercase tracking-[0.1em]"
-                >
-                  <Plus size={14} className="mr-2" />
-                  New Collection
-                </button>
-              )}
-
-              {filteredCollections.length === 0 && (
-                <div className="text-center text-xs text-textSecondary italic py-6">Create a collection to organize your requests.</div>
-              )}
-
-              {filteredCollections.map(col => {
-                const isExpanded = expandedCollections.has(col.id);
-                const colRequests = savedRequests.filter(r => r.collectionId === col.id);
-
-                return (
-                  <div key={col.id} className="group/col mb-1 last:mb-0">
-                    <div
-                      className="flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.03] group/header transition-all border border-transparent hover:border-white/5"
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setCollectionContextMenu({ x: e.clientX, y: e.clientY, collectionId: col.id });
-                      }}
+            {/* HISTORY VIEW */}
+            {sidebarView === 'history' && (
+              <ul className="space-y-2">
+                {filteredHistory.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      onClick={() => restoreRequest(item.request)}
+                      className="w-full text-left p-2 rounded-lg hover:bg-surfaceLight/50 border border-transparent hover:border-border transition-all group relative overflow-hidden"
                     >
-                      <button
-                        onClick={() => toggleCollection(col.id)}
-                        className="flex items-center gap-3 flex-1 overflow-hidden"
-                      >
-                        <ChevronRight size={12} className={`text-textSecondary/20 transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
-                        <div className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'bg-primary/10' : 'bg-surfaceHighlight/20'}`}>
-                          {isExpanded ? <FolderOpen size={14} className="text-primary" /> : <Folder size={14} className="text-textSecondary/60" />}
-                        </div>
-                        <span className={`text-[13px] font-semibold truncate transition-colors ${isExpanded ? 'text-foreground' : 'text-textSecondary/80 group-hover/header:text-foreground'}`}>{col.name}</span>
-                      </button>
-                      <button
-                        onClick={() => deleteCollection(col.id)}
-                        className="opacity-0 group-hover/header:opacity-100 text-textSecondary/30 hover:text-danger transition-all p-1.5 rounded-lg hover:bg-danger/10"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="pl-4 border-l border-white/5 ml-4.5 my-1 space-y-1">
-                        {colRequests.length === 0 && (
-                          <div className="text-[10px] text-textSecondary/30 pl-4 py-3 italic">Empty collection</div>
-                        )}
-                        {colRequests.filter(req => req && req.id).map(req => (
-                          <div key={req.id} className="flex items-center group/req">
-                            <button
-                              onClick={() => restoreRequest(req)}
-                              className={`flex-1 flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] text-left overflow-hidden transition-all border border-transparent ${request.id === req.id ? 'bg-primary/5 border-primary/20 shadow-sm' : 'hover:border-white/5'}`}
-                            >
-                              <div className={`w-10 text-[9px] font-black tracking-tighter text-center rounded-lg py-1 border shadow-sm ${req.method === 'GET' ? 'text-blue-400 bg-blue-500/5 border-blue-500/10' :
-                                req.method === 'POST' ? 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10' :
-                                  req.method === 'DELETE' ? 'text-red-400 bg-red-500/5 border-red-500/10' :
-                                    'text-indigo-400 bg-indigo-500/5 border-indigo-500/10'
-                                }`}>
-                                {req.method}
-                              </div>
-                              <span className={`text-[12px] truncate font-bold transition-colors ${request.id === req.id ? 'text-primary' : 'text-textSecondary/80 group-hover/req:text-foreground'}`}>{req.name}</span>
-                            </button>
-                            <button
-                              onClick={() => deleteSavedRequest(req.id)}
-                              className="opacity-0 group-hover/req:opacity-100 p-2 text-textSecondary/30 hover:text-danger rounded-xl transition-all hover:bg-danger/10"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        ))}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.request.method === 'GET' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+                          item.request.method === 'POST' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                            item.request.method === 'DELETE' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                              'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                          }`}>
+                          {item.request.method}
+                        </span>
+                        <span className={`text-[10px] font-mono font-semibold ${item.responseStatus && item.responseStatus >= 400 ? 'text-danger' : 'text-success'}`}>
+                          {item.responseStatus || '...'}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-        </div>
-
-        {/* User Footer */}
-        <div className="mx-4 mb-4 mt-auto p-3 bg-surfaceHighlight/10 backdrop-blur-md rounded-2xl border border-white/5 transition-all group hover:bg-surfaceHighlight/20 hover:border-white/10 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-[11px] font-black text-white shadow-lg shrink-0">
-                {user.name.charAt(0)}
-              </div>
-              <div className="flex flex-col min-w-0 leading-tight">
-                <span className="text-[12px] font-bold text-foreground/90 truncate">{user.name}</span>
-                <span className="text-[10px] text-textSecondary/40 font-bold uppercase tracking-widest leading-none mt-0.5">Pro User</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => {
-                  if (user) fetchInvitations(user.email);
-                  setShowInboxModal(true);
-                }}
-                className="text-textSecondary/30 hover:text-primary transition-all p-2 hover:bg-primary/10 rounded-lg relative group/icon"
-                title="View invitations"
-              >
-                <Mail size={14} />
-                {invitations.length > 0 && (
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-danger rounded-full ring-2 ring-surface animate-pulse" />
+                      <div className="text-[11px] text-textSecondary truncate font-medium group-hover:text-foreground transition-colors">
+                        {item.request.url.replace(/^https?:\/\//, '')}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+                {filteredHistory.length === 0 && (
+                  <li className="p-4 text-center border border-border rounded-lg bg-surfaceLight/5">
+                    <p className="text-xs text-textSecondary">No history in this workspace.</p>
+                  </li>
                 )}
-              </button>
-              <button
-                onClick={handleLogout}
-                className="text-textSecondary/30 hover:text-danger p-2 transition-all hover:bg-danger/10 rounded-lg"
-                title="Logout"
-              >
-                <LogOut size={14} />
-              </button>
+              </ul>
+            )}
+
+            {/* COLLECTIONS VIEW */}
+            {sidebarView === 'collections' && (
+              <div className="space-y-3">
+                {activeWorkspaceId !== DEFAULT_WORKSPACE.id && (
+                  <button
+                    onClick={() => setShowCreateCollectionModal(true)}
+                    className="w-full flex items-center justify-center py-2 mb-2 bg-white/5 hover:bg-primary/5 text-primary/70 hover:text-primary rounded-xl border border-dashed border-white/10 hover:border-primary/30 transition-all font-bold text-[10px] uppercase tracking-[0.1em]"
+                  >
+                    <Plus size={14} className="mr-2" />
+                    New Collection
+                  </button>
+                )}
+
+                {filteredCollections.length === 0 && (
+                  <div className="text-center text-xs text-textSecondary italic py-6">Create a collection to organize your requests.</div>
+                )}
+
+                {filteredCollections.map(col => {
+                  const isExpanded = expandedCollections.has(col.id);
+                  const colRequests = savedRequests.filter(r => r.collectionId === col.id);
+
+                  return (
+                    <div key={col.id} className="group/col mb-1 last:mb-0">
+                      <div
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.03] group/header transition-all border border-transparent hover:border-white/5"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setCollectionContextMenu({ x: e.clientX, y: e.clientY, collectionId: col.id });
+                        }}
+                      >
+                        <button
+                          onClick={() => toggleCollection(col.id)}
+                          className="flex items-center gap-3 flex-1 overflow-hidden"
+                        >
+                          <ChevronRight size={12} className={`text-textSecondary/20 transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
+                          <div className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'bg-primary/10' : 'bg-surfaceHighlight/20'}`}>
+                            {isExpanded ? <FolderOpen size={14} className="text-primary" /> : <Folder size={14} className="text-textSecondary/60" />}
+                          </div>
+                          <span className={`text-[13px] font-semibold truncate transition-colors ${isExpanded ? 'text-foreground' : 'text-textSecondary/80 group-hover/header:text-foreground'}`}>{col.name}</span>
+                        </button>
+                        <button
+                          onClick={() => deleteCollection(col.id)}
+                          className="opacity-0 group-hover/header:opacity-100 text-textSecondary/30 hover:text-danger transition-all p-1.5 rounded-lg hover:bg-danger/10"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="pl-4 border-l border-white/5 ml-4.5 my-1 space-y-1">
+                          {colRequests.length === 0 && (
+                            <div className="text-[10px] text-textSecondary/30 pl-4 py-3 italic">Empty collection</div>
+                          )}
+                          {colRequests.filter(req => req && req.id).map(req => (
+                            <div key={req.id} className="flex items-center group/req">
+                              <button
+                                onClick={() => restoreRequest(req)}
+                                className={`flex-1 flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] text-left overflow-hidden transition-all border border-transparent ${request.id === req.id ? 'bg-primary/5 border-primary/20 shadow-sm' : 'hover:border-white/5'}`}
+                              >
+                                <div className={`w-10 text-[9px] font-black tracking-tighter text-center rounded-lg py-1 border shadow-sm ${req.method === 'GET' ? 'text-blue-400 bg-blue-500/5 border-blue-500/10' :
+                                  req.method === 'POST' ? 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10' :
+                                    req.method === 'DELETE' ? 'text-red-400 bg-red-500/5 border-red-500/10' :
+                                      'text-indigo-400 bg-indigo-500/5 border-indigo-500/10'
+                                  }`}>
+                                  {req.method}
+                                </div>
+                                <span className={`text-[12px] truncate font-bold transition-colors ${request.id === req.id ? 'text-primary' : 'text-textSecondary/80 group-hover/req:text-foreground'}`}>{req.name}</span>
+                              </button>
+                              <button
+                                onClick={() => deleteSavedRequest(req.id)}
+                                className="opacity-0 group-hover/req:opacity-100 p-2 text-textSecondary/30 hover:text-danger rounded-xl transition-all hover:bg-danger/10"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+          </div>
+
+          {/* User Footer */}
+          <div className="mx-4 mb-4 mt-auto p-3 bg-surfaceHighlight/10 backdrop-blur-md rounded-2xl border border-white/5 transition-all group hover:bg-surfaceHighlight/20 hover:border-white/10 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-[11px] font-black text-white shadow-lg shrink-0">
+                  {user.name.charAt(0)}
+                </div>
+                <div className="flex flex-col min-w-0 leading-tight">
+                  <span className="text-[12px] font-bold text-foreground/90 truncate">{user.name}</span>
+                  <span className="text-[10px] text-textSecondary/40 font-bold uppercase tracking-widest leading-none mt-0.5">Pro User</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => {
+                    if (user) fetchInvitations(user.email);
+                    setShowInboxModal(true);
+                  }}
+                  className="text-textSecondary/30 hover:text-primary transition-all p-2 hover:bg-primary/10 rounded-lg relative group/icon"
+                  title="View invitations"
+                >
+                  <Mail size={14} />
+                  {invitations.length > 0 && (
+                    <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-danger rounded-full ring-2 ring-surface animate-pulse" />
+                  )}
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="text-textSecondary/30 hover:text-danger p-2 transition-all hover:bg-danger/10 rounded-lg"
+                  title="Logout"
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1986,55 +2017,64 @@ const App: React.FC = () => {
 
         <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden z-0">
           {/* Request Tabs Bar */}
-          <div className="flex items-center gap-1 border-b border-border px-1">
-            {requestTabs.map((tab) => (
-              <div
-                key={tab.id}
-                className={`group flex items-center gap-2 px-4 py-2.5 rounded-t-lg transition-all min-w-[120px] max-w-[200px] relative cursor-pointer select-none mb-[-1px] ${activeTabId === tab.id
-                  ? 'bg-surfaceHighlight/50 text-foreground font-medium'
-                  : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/10'
-                  }`}
-                onClick={() => setActiveTabId(tab.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setContextMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
-                }}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${tab.request.method === 'GET' ? 'bg-blue-500' :
-                  tab.request.method === 'POST' ? 'bg-emerald-500' :
-                    tab.request.method === 'DELETE' ? 'bg-red-500' :
-                      tab.request.method === 'PUT' ? 'bg-indigo-500' :
-                        'bg-zinc-500'
-                  }`} />
-                <span className="text-xs truncate flex-1 leading-none">
-                  {tab.request.name}
-                </span>
-                {isTabDirty(tab.id) && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(59,130,246,0.6)] flex-shrink-0" title="Unsaved changes" />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab.id);
-                  }}
-                  className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all flex-shrink-0 ${activeTabId === tab.id ? 'hover:bg-surfaceLight' : 'hover:bg-surfaceLight/30'}`}
-                  title="Close tab"
-                >
-                  <X size={12} className="text-textSecondary hover:text-foreground" />
-                </button>
-              </div>
-            ))}
+          <div className="flex items-center gap-1 border-b border-white/5 px-2 bg-gradient-to-r from-surfaceHighlight/5 to-transparent">
+            {/* Sidebar Toggle */}
             <button
-              onClick={createNewTab}
-              className="px-3 py-2 text-textSecondary hover:text-foreground hover:bg-surfaceLight/10 rounded-t-lg transition-all flex items-center justify-center flex-shrink-0"
-              title="New Request"
+              onClick={() => setShowSidebar(!showSidebar)}
+              className="p-2 mr-1 text-textSecondary/40 hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-transparent hover:border-primary/20 group/sidebar-toggle"
+              title={showSidebar ? "Hide Sidebar" : "Show Sidebar"}
             >
-              <Plus size={14} />
+              {showSidebar ? <PanelLeftClose size={18} className="group-hover/sidebar-toggle:-translate-x-0.5 transition-transform" /> : <PanelLeftOpen size={18} className="text-primary animate-pulse" />}
             </button>
 
-            <div className="flex-1"></div>
+            <div className="flex-1 flex items-center overflow-x-auto scrollbar-hide min-w-0 pr-4">
+              {requestTabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className={`group flex items-center gap-2 px-4 py-2.5 rounded-t-lg transition-all min-w-[120px] max-w-[200px] relative cursor-pointer select-none mb-[-1px] ${activeTabId === tab.id
+                    ? 'bg-surfaceHighlight/50 text-foreground font-medium'
+                    : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/10'
+                    }`}
+                  onClick={() => setActiveTabId(tab.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
+                  }}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${tab.request.method === 'GET' ? 'bg-blue-500' :
+                    tab.request.method === 'POST' ? 'bg-emerald-500' :
+                      tab.request.method === 'DELETE' ? 'bg-red-500' :
+                        tab.request.method === 'PUT' ? 'bg-indigo-500' :
+                          'bg-zinc-500'
+                    }`} />
+                  <span className="text-xs truncate flex-1 leading-none">
+                    {tab.request.name}
+                  </span>
+                  {isTabDirty(tab.id) && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(59,130,246,0.6)] flex-shrink-0" title="Unsaved changes" />
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(tab.id);
+                    }}
+                    className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all flex-shrink-0 ${activeTabId === tab.id ? 'hover:bg-surfaceLight' : 'hover:bg-surfaceLight/30'}`}
+                    title="Close tab"
+                  >
+                    <X size={12} className="text-textSecondary hover:text-foreground" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={createNewTab}
+                className="px-3 py-2 text-textSecondary hover:text-foreground hover:bg-surfaceLight/10 rounded-t-lg transition-all flex items-center justify-center flex-shrink-0"
+                title="New Request"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
 
-            <div className="flex border-l border-border ml-2 pl-2 gap-1 py-1 mr-2 items-center">
+            <div className="flex flex-shrink-0 border-l border-border ml-2 pl-2 gap-1 py-1 mr-2 items-center">
               <button
                 onClick={() => setLayoutMode('horizontal')}
                 className={`p-1.5 rounded-md transition-all ${layoutMode === 'horizontal' ? 'text-primary bg-primary/10' : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/50'}`}
@@ -2094,6 +2134,14 @@ const App: React.FC = () => {
                   </>
                 )}
               </div>
+
+              <button
+                onClick={() => setShowAiPanel(!showAiPanel)}
+                className={`p-1.5 rounded-md transition-all ${showAiPanel ? 'text-primary bg-primary/10' : 'text-textSecondary hover:text-foreground hover:bg-surfaceLight/50'}`}
+                title="AI Agent"
+              >
+                <Bot size={14} />
+              </button>
 
               <button
                 onClick={cycleBrightness}
@@ -2278,25 +2326,73 @@ const App: React.FC = () => {
             </>
           )}
 
-          <div className={`flex ${layoutMode === 'horizontal' ? 'flex-row' : 'flex-col'} gap-4 overflow-hidden flex-1`}>
-            {/* Request Panel (Left/Top) */}
-            <div className="flex-1 flex flex-col min-w-[400px] bg-surfaceLight/20 rounded-2xl relative overflow-hidden">
-              <RequestPanel
-                request={request}
-                onRequestChange={handleRequestChange}
-                onSend={handleSendRequest}
-                onSave={openSaveRequestModal}
-                loading={loading}
-                environmentVariables={activeEnvVars}
-                isSavedRequest={!!(request.id && savedRequests.find(r => r.id === request.id))}
-                addToast={addToast}
-              />
+          <div className="flex flex-row overflow-hidden flex-1 gap-4">
+            <div className={`flex ${showAiPanel ? 'flex-col' : (layoutMode === 'horizontal' ? 'flex-row' : 'flex-col')} gap-4 overflow-hidden flex-1 transition-all duration-300`}>
+              {/* Request Panel (Left/Top) */}
+              <div className="flex-1 flex flex-col min-w-[400px] bg-surfaceLight/20 rounded-2xl relative overflow-hidden transition-all duration-300">
+                <RequestPanel
+                  request={request}
+                  onRequestChange={handleRequestChange}
+                  onSend={handleSendRequest}
+                  onSave={openSaveRequestModal}
+                  loading={loading}
+                  environmentVariables={activeEnvVars}
+                  isSavedRequest={!!(request.id && savedRequests.find(r => r.id === request.id))}
+                  addToast={addToast}
+                />
+              </div>
+
+              {/* Response Panel (Right/Bottom) */}
+              <div className="flex-1 flex flex-col min-w-[400px] bg-surfaceLight/20 rounded-2xl overflow-hidden transition-all duration-300">
+                <ResponsePanel response={response} loading={loading} addToast={addToast} />
+              </div>
             </div>
 
-            {/* Response Panel (Right/Bottom) */}
-            <div className="flex-1 flex flex-col min-w-[400px] bg-surfaceLight/20 rounded-2xl overflow-hidden">
-              <ResponsePanel response={response} loading={loading} addToast={addToast} />
-            </div>
+            {showAiPanel && (
+              <div
+                className="bg-surfaceHighlight/10 backdrop-blur-sm rounded-2xl overflow-hidden flex flex-col border border-white/5 relative shadow-2xl animate-in slide-in-from-right duration-300 z-10"
+                style={{ width: `${aiPanelWidth}px` }}
+              >
+                <div className="p-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bot size={16} className="text-primary" />
+                    <span className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground/80">AI Agent</span>
+                  </div>
+                  <span className="text-[9px] font-black text-primary/80 bg-primary/10 px-2.5 py-1 rounded-lg uppercase tracking-wider">Alpha</span>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-transparent to-primary/5">
+                  <div className="w-20 h-20 rounded-[2.5rem] bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-8 border border-white/10 shadow-[0_0_30px_rgba(59,130,246,0.2)] group hover:scale-110 transition-transform duration-500">
+                    <Bot size={40} className="text-primary/60 group-hover:text-primary transition-colors" />
+                  </div>
+                  <h3 className="text-xl font-bold text-foreground/90 mb-3 tracking-tight">AI Assistant</h3>
+                  <p className="text-xs text-textSecondary/50 max-w-[220px] leading-relaxed font-medium">
+                    The AI Agent is coming soon to help you automate, optimize, and document your API requests.
+                  </p>
+                  <div className="mt-8 px-4 py-2 bg-white/5 rounded-xl border border-white/5 text-[10px] font-bold text-textSecondary/40 uppercase tracking-widest animate-pulse">
+                    Coming Soon
+                  </div>
+                </div>
+
+                {/* Resizer handle */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/40 transition-colors z-30"
+                  onMouseDown={(e) => {
+                    const startX = e.clientX;
+                    const startWidth = aiPanelWidth;
+                    const onMouseMove = (moveEvent: MouseEvent) => {
+                      const newWidth = startWidth - (moveEvent.clientX - startX);
+                      if (newWidth > 280 && newWidth < 800) setAiPanelWidth(newWidth);
+                    };
+                    const onMouseUp = () => {
+                      document.removeEventListener('mousemove', onMouseMove);
+                      document.removeEventListener('mouseup', onMouseUp);
+                    };
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
